@@ -24,15 +24,16 @@ Export each exposure as an individual 16 bit PNG.  File > Save a Copy, and chang
 Place these files in the 'data' folder.  You can also place verification images that will get the final calculated conversion applied to them. They are named 'test_0.png' if the file is middle exposure, 'test_1.png' if the file is over exposed 1 stop, 'test_-2.png' if the file is under exposed 2 stops.  These files can be a simple copy of test charts created above or any image you want to see the correction applied to with calculated exposure correction applied.
 
 ## Python Program
-Dependencies;
-scipy
-multiprocessing
-matplotlib
-skimage
-imageio.v3
-colour-science
-colorsys
-numpy
+
+### Dependencies
+	scipy
+	multiprocessing
+	matplotlib
+	skimage
+	imageio.v3
+	colour-science
+	colorsys
+	numpy
 
 'main.py' is the program itself. Default arguments should produce reasonable results, but can be tweaked by user if desired
 
