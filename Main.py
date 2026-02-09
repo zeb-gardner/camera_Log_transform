@@ -20,6 +20,7 @@ from colour.models import RGB_COLOURSPACE_sRGB
 from colour.models import RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT
 from colour.models import RGB_COLOURSPACE_BT709
 from colour.models import RGB_COLOURSPACE_ACESCG
+from colour.models import RGB_COLOURSPACE_ACES2065_1
 
 import cv2 as cv
 import png
@@ -35,13 +36,10 @@ from beautifultable import BeautifulTable
 
 
 
+ERROR_PERCENTILE_LIMIT = 90  # Exclude chip error outliers above this percentile
 
-CHIP_SAFE_AREA = 0.15 #What % of chip x/y is safe for use in model.
-
-ERROR_PERCENTILE_LIMIT = 85  # Exclude chip error outliers above this percentile
-
-CHART_UPPER_PERCENTILE = 85  #Keep pixels in this range, exlude outliers to reduce noise
-CHART_LOWER_PERCENTILE = 15
+CHART_UPPER_PERCENTILE = 90  #Keep pixels in this range, exlude outliers to reduce noise
+CHART_LOWER_PERCENTILE = 10
 
 SAVE_LUT = 1 #Save 1 = Shaper Lut, 2  = 3d Cube, 3 = CLF, 4 = all
 
@@ -57,7 +55,7 @@ SLOPE_MAX = 5
 SMOOTHING = 1  #How much to increase error based on sharp curve in Luma Curve
 
 MAX_ITER_LUM = 8
-MAX_ITER_3X3 = 10
+MAX_ITER_3X3 = 8
 MAX_ITER_S_GAIN = 10
 MAX_ITER_S_GAMMA = 10
 
@@ -67,12 +65,11 @@ NUM_CHILDREN = 2000
 
 NUM_THREADS = 12
 
-PETURB_MAX_C = 0.1  # Color for 3x3 genetic algorithm
-NUM_CHILDREN_C = 40
+PETURB_MAX_C = 0.25  # Color for 3x3 genetic algorithm
+NUM_CHILDREN_C = 30
 NUM_PARENT_C = 20
 
-
-PERTURB_MAX_3X3 = 0.2  #for Binary Search Algorithms
+PERTURB_MAX_3X3 = 0.1  #for Binary Search Algorithms
 PERTURB_MAX_HUE_HUE = 0.01
 PERTURB_MAX_HUE_SAT = 0.02
 PERTURB_MAX_S_GAIN = 0.1
@@ -87,7 +84,7 @@ ILLUM_D55 = (0.33242, 0.34743)
 ILLUM_D50 = (0.34567,0.35850)
 ILLUMINANT = ILLUM_D65
 CAT = 'CAT02'   # 'CAT16' or 'CAT02'
-INPUT_ILLUMINANT = [-1,-1]  #Set to correct WB of input images
+INPUT_ILLUMINANT = [-1,-1]  #Will be set to correct WB of input images
 
 
 ILLUM_OPT_MAX = 0.01  #Max step in  output Illuminant optimization
@@ -110,11 +107,12 @@ MANUAL_HUE_SAT =[0,0,0,0,0,0,0]
 GAM_COMP_STRENGTH = 1  # scale parameters of Gammut Compression, Larger is more compression, 1.0 matches ACES recommended, Range 0.9 to 1.2
 
 INT_THREE_BY_THREE = np.array([
-    [1,0,0],
-    [0,1,0],
-    [0,0,1]])
+    [0.6,0,0],
+    [0.2,1,0],
+    [0.2,0,1]])
 
-#INT_THREE_BY_THREE = SRGB_2_XYZ_MATRIX.copy()
+#INT_THREE_BY_THREE =  colour.RGB_to_RGB(INT_THREE_BY_THREE,RGB_COLOURSPACE_BT709, RGB_COLOURSPACE_ACES2065_1,chromatic_adaptation_transform=None, apply_cctf_decoding=False, apply_cctf_encoding=False)
+
 
 RGB_COLOURSPACE_LIN_CIEXYZ_SCENE = colour.RGB_Colourspace('CIE XYZ - Scene-referred',
                           [[ 1.,  0.], [ 0.,  1.], [ 0.,  0.]], (0.31272,0.32903),'D65',
@@ -132,7 +130,6 @@ RGB_COLOURSPACE_LIN_sRGB.cctf_decoding= None
 RGB_COLOURSPACE_LIN_sRGB.cctf_encoding= None
 
 FLAT_RGB = None  #Array if flats provided
-FLAT_COMP_STRENGTH = 1  #How strong is flat correction compensation, 0 is none, 1 is full strength
 
 FIT_MODE = "CALC"
 
@@ -240,7 +237,7 @@ def main(args):
     bez_count_hue_sat = args.bez_count_hue_sat +1
     lum_opt_iter = args.lum_opt_iter
     three_by_three_opt_iter = args.three_by_three_opt_iter
-    WB_Control = args.WB_Control
+    WB_Control =0  # Not used
     hue_loop_iter = args.hue_loop_iter
     sat_opt_iter = args.sat_opt_iter
     hue_hue_opt_iter = args.hue_hue_opt_iter
@@ -310,11 +307,11 @@ def main(args):
         min = np.min(temp, axis=0)
         print ("Flat mean = ", mean ," Flat Max = " , max," Flat min = ", min  , " Delta = ", (max-min)/mean)
 
-    input_blackpoint = np.min(chips_min)  #Find lowest/Highest individual pixel
-    input_whitepoint = np.max(chips_max)
+    #input_blackpoint = np.min(chips_min)  #Find lowest/Highest individual pixel
+    #input_whitepoint = np.max(chips_max)
 
-    #input_blackpoint = np.min(test_chart_RGB)  #Find lowest/ highest value of each chip average
-    #input_whitepoint = np.max(test_chart_RGB)
+    input_blackpoint = np.min(test_chart_RGB)  #Find lowest/ highest value of each chip average
+    input_whitepoint = np.max(test_chart_RGB)
 
 
     exp_chip_count = np.sum(EXP_CHIPS)
@@ -396,6 +393,13 @@ def main(args):
 
     print("\nLuma 1 Error = ", lum1_error , "Luma 2 Error = ",lum2_error)
 
+    if three_by_three_opt_iter:
+        bez_curve_lum = interp_1d_setup(bez_count_lum, best_bez_lum[:, 1], hue=0, input_blackpoint=input_blackpoint,
+                                        input_whitepoint=input_whitepoint, input_MG=input_MG)
+        best_three_by_three = main_color(test_chart_RGB, bez_curve_lum, best_three_by_three, bad_chips,
+                                         chart_name_low, chart_name_high, chart_weight, three_by_three_opt_iter)
+        print("\n")
+
     if FIT_MODE == "CALC":  #Skip if using calulated log formula
         # Genetic algorithm
         best_bez_lum = main_luma(best_bez_lum, num_charts, test_chart_RGB, input_blackpoint, input_whitepoint, bad_chips,
@@ -414,7 +418,7 @@ def main(args):
                                bad_chips, "Luma2", chart_weight, final=0, input_blackpoint=input_blackpoint,
                                input_whitepoint=input_whitepoint, input_MG=input_MG)
 
-        print("Luma 1 Error = ", lum1_error,  "Luma 2 Error = ", lum2_error )
+        print("Luma 1 Error = ", lum1_error,  "Luma 2 Error = ", lum2_error, "\n" )
 
 
 
@@ -428,15 +432,11 @@ def main(args):
             SMOOTHING =  SMOOTHING *5
             #print( "SLOPE_LIMIT = ", SLOPE_LIMIT, " SMOOTHING = ", SMOOTHING )
 
-
         # Binary Search 3x3
         best_three_by_three = three_by_three_binary(PERTURB_MAX_3X3 / (1.5**num_round_outer), test_chart_RGB, chart_name_low,
                                                     chart_name_high, best_three_by_three, bad_chips,chart_weight,bez_count_lum,
                                                     best_bez_lum, bez_count_hue_hue,bez_count_hue_sat,best_bez_hue_hue,best_bez_hue_sat,
                                                     input_blackpoint,input_whitepoint, s_gain,s_gamma,input_MG, WB_Control)
-
-
-
 
         #Run Binary Search Luma Optimizations
         print ("\nBinary Search round ",num_round_outer, " of ", lum_opt_iter)
@@ -497,26 +497,19 @@ def main(args):
         if three_by_three_opt_iter:
             bez_curve_lum = interp_1d_setup(bez_count_lum, best_bez_lum[:, 1], hue=0, input_blackpoint=input_blackpoint,
                                             input_whitepoint=input_whitepoint, input_MG=input_MG)
-            best_three_by_three = main_color(test_chart_RGB, bez_curve_lum, best_three_by_three, bad_chips,num_round_outer, chart_name_low, chart_name_high, chart_weight, three_by_three_opt_iter)
+            best_three_by_three = main_color(test_chart_RGB, bez_curve_lum, best_three_by_three, bad_chips, chart_name_low, chart_name_high, chart_weight, three_by_three_opt_iter)
             #best_three_by_three = main_color_thread(test_chart_RGB, bez_curve_lum, best_three_by_three, num_charts, bad_chips,num_round_outer, chart_name_low, chart_name_high, chart_weight,three_by_three_opt_iter, WB_Control)
+            print("\n")
+
 
         # Run Input Illuminant Optimization
-        if (num_round_outer == lum_opt_iter) and enable_optimize_illum and INPUT_ILLUMINANT == [-1, -1]:
+        if (num_round_outer == lum_opt_iter)  and INPUT_ILLUMINANT == [-1, -1] and (enable_optimize_illum =="I" or enable_optimize_illum =="IO") :
             num_round_outer = 0
             illum_flag = 1
             bez_curve_lum = interp_1d_setup(bez_count_lum, best_bez_lum[:, 1], hue=0, input_blackpoint=input_blackpoint,
                                             input_whitepoint=input_whitepoint, input_MG=input_MG)
             optimize_input_illum(test_chart_RGB, chart_name_low, chart_name_high, bez_curve_lum, best_three_by_three)
             print ("\nRunning Optimization loop again with new input illuminant")
-
-        """if (num_round_outer == lum_opt_iter) and enable_optimize_illum and illum_flag ==1 :  #Run once more at end.
-            illum_flag = 0
-            num_round_outer = 0
-            bez_curve_lum = interp_1d_setup(bez_count_lum, best_bez_lum[:, 1], hue=0, input_blackpoint=input_blackpoint,
-                                            input_whitepoint=input_whitepoint, input_MG=input_MG)
-            optimize_input_illum(test_chart_RGB, chart_name_low, chart_name_high, bez_curve_lum, best_three_by_three)"""
-
-
 
 
     print("\nTotal Time (s) = ",  time.time() - time_start_lum )
@@ -689,8 +682,14 @@ def main(args):
     bez_curve_hue_sat = interp_1d_setup(bez_count_hue_sat, bez_values_hue_sat[range(bez_count_hue_sat), 1], hue=1,
                                         input_blackpoint=input_blackpoint, input_whitepoint=input_whitepoint,
                                         mode=HSL_MODE)
-    #Optimize output Illuminant
-    ILLUMINANT = optimize_ouput_illum(best_three_by_three, s_gamma, s_gain, bez_curve_hue_hue, bez_curve_hue_sat)
+
+    if (enable_optimize_illum =="O" or enable_optimize_illum =="IO"):       #Optimize output Illuminant
+        ILLUMINANT = optimize_ouput_illum(best_three_by_three, s_gamma, s_gain, bez_curve_hue_hue, bez_curve_hue_sat)
+    else:
+        output_WB_error = wb_error(best_three_by_three, 1, s_gamma, s_gain, bez_curve_hue_hue, bez_curve_hue_sat)
+        temperature = colour.xy_to_CCT(np.array(ILLUMINANT))
+        print("Non-Optimized Output Illum = ", f'{ILLUMINANT[0]:.8f}', ",", f'{ILLUMINANT[1]:.8f}', " Temp = ", temperature,
+              " Output WB Error = ", output_WB_error)
 
     calc_dr(test_chart_RGB, chart_name_low, chart_name_high, bez_curve_lum, input_whitepoint)
 
@@ -712,13 +711,13 @@ def main(args):
             print("\nWriting Shaper LUT ")
             write_lut_shaper(lut_name, bez_curve_lum, best_three_by_three,
                 norm_lut_max, input_whitepoint,input_blackpoint, s_gain, s_gamma, gammut_comp, expand_tone,
-                inflection_percent, bez_count_hue_hue, best_bez_hue_hue, bez_count_hue_sat, best_bez_hue_sat)
+                inflection_percent, bez_count_hue_hue, best_bez_hue_hue, bez_count_hue_sat, best_bez_hue_sat, enable_optimize_illum)
 
         if SAVE_LUT ==2 or SAVE_LUT == 4:  # Cube
             print("\nWriting Cube LUT ")
             write_lut_cube(lut_name, bez_curve_lum, best_three_by_three ,rec709_lut,
                            input_whitepoint,input_blackpoint,s_gain,s_gamma, DWG_I_lut,gammut_comp,expand_tone,inflection_percent,
-                           best_bez_hue_hue,bez_count_hue_hue,best_bez_hue_sat,bez_count_hue_sat)
+                           best_bez_hue_hue,bez_count_hue_hue,best_bez_hue_sat,bez_count_hue_sat, enable_optimize_illum)
 
         if SAVE_LUT == 3 or SAVE_LUT == 4: #  CLF
             print ("\nWriting CLF LUT ")
@@ -861,7 +860,7 @@ def calc_bad_chips(chart_name_low,chart_name_high, chips_min,chips_max,white_poi
 
 
 def write_lut_cube(filename, bez_curve_lum, three_by_three ,rec709_lut,input_whitepoint,input_blackpoint,s_gain, s_gamma, DWG_I_lut,gammut_comp,
-                   expand_tone,inflection_percent,best_bez_hue_hue,bez_count_hue_hue,best_bez_hue_sat,bez_count_hue_sat):
+                   expand_tone,inflection_percent,best_bez_hue_hue,bez_count_hue_hue,best_bez_hue_sat,bez_count_hue_sat, enable_optimize_illum):
 
 
     bez_hue_hue = best_bez_hue_hue[range(bez_count_hue_hue), 1]
@@ -905,7 +904,7 @@ def write_lut_cube(filename, bez_curve_lum, three_by_three ,rec709_lut,input_whi
 
         #out = np.clip(out, a_min=0, a_max=None)
 
-        if (rec709_lut): out = linSRGB_2_sRGB(out)
+        if (rec709_lut): out = ACES2065_2_REC709(out)
 
 
         for i in range(1024):
@@ -943,10 +942,7 @@ def write_lut_cube(filename, bez_curve_lum, three_by_three ,rec709_lut,input_whi
             out = np.clip(out, a_min=0, a_max=None)"""
 
         if not(s_gain ==1 and s_gamma ==1 ):  #No Need for HSL adjustments
-
-
-
-            out_HSL = linsRGB_2_HSL(out)
+            out_HSL = ACES2065_2_HSL(out)
             print("Running HSL Adjustments")
 
             np.where(out_HSL[:, :, :, 0] < 0, out_HSL[:, :, :, 0],out_HSL[:, :, :, 0] + 1)  # Normalize Hue values that wrapped around
@@ -963,23 +959,22 @@ def write_lut_cube(filename, bez_curve_lum, three_by_three ,rec709_lut,input_whi
             out_HSL[:, :, :,1] = out_HSL[:, :,:, 1] * interp_1d(out_HSL[:, :,:, 0],bez_curve_hue_sat)  # Apply Hue_sat Curve
             #out_HSL = np.clip(out_HSL, a_min=0, a_max=None)
 
-            out = HSL_2_linSRGB(out_HSL)  # Convert back to linSRGB
+            out = HSL_2_ACES2065(out_HSL)  # Convert back to Aces2065
 
         if (expand_tone): #Do tone expansion in xyY space as OKlab was found to introduce artifacts.
             init_max = interp_1d(input_whitepoint, bez_curve_lum)
             t = [init_max, init_max, init_max]
-
-            colour.RGB_to_RGB(t, RGB_COLOURSPACE_LIN_sRGB, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,
-                              chromatic_adaptation_transform=None, apply_cctf_decoding=False, apply_cctf_encoding=False)
+            ACES2065_2_XYZ(t)
             init_max = colour.XYZ_to_xyY(t)[2]
-
             out = tone_map_xyY(out, inflection_percent, init_max)
 
 
         if (rec709_lut):
-            out = linSRGB_2_sRGB(out)
+            out = ACES2065_2_REC709(out)
         elif (DWG_I_lut):
-            out = linSRGB_2_DWG_I_CAT(out)
+            if (enable_optimize_illum == "O" or enable_optimize_illum == "IO"):
+                out = ACES2065_2_DWG_I_CAT(out)
+            else:  out = ACES2065_2_DWG_I(out)
 
         for k in range(lut_size):
             for j in range(lut_size):
@@ -1014,7 +1009,7 @@ def write_lut_1D(filename, bez_curve_lum, input_whitepoint ):
 
 
 def write_lut_shaper(filename, bez_curve_lum, three_by_three,norm_lut_max,input_whitepoint,input_blackpoint,
-                   s_gain, s_gamma,gammut_comp,expand_tone,inflection_percent,bez_count_hue_hue, best_bez_hue_hue, bez_count_hue_sat, best_bez_hue_sat):
+                   s_gain, s_gamma,gammut_comp,expand_tone,inflection_percent,bez_count_hue_hue, best_bez_hue_hue, bez_count_hue_sat, best_bez_hue_sat ,enable_optimize_illum):
 
 
     bez_hue_hue = best_bez_hue_hue[range(bez_count_hue_hue), 1]
@@ -1030,7 +1025,7 @@ def write_lut_shaper(filename, bez_curve_lum, three_by_three,norm_lut_max,input_
                                         input_blackpoint=input_blackpoint,
                                         input_whitepoint=input_whitepoint, mode=HSL_MODE)
 
-    lut_size_1d = 1024
+    lut_size_1d = 4096
     lut_size_3d = 65
 
     max_in_1d = input_whitepoint
@@ -1081,11 +1076,10 @@ def write_lut_shaper(filename, bez_curve_lum, three_by_three,norm_lut_max,input_
 
         if (gammut_comp):
             out = gammut_compression(out, GAM_COMP_STRENGTH,gammut_comp)
-            """else:
-                    out = np.clip(out, a_min=0, a_max=None)"""
 
-        if not (s_gain == 1 and s_gamma == 1):  # No Need for HSL adjustments
-            out_HSL = linsRGB_2_HSL(out)
+
+        if not (s_gain == 1 and s_gamma == 1):  # HSL adjustments
+            out_HSL = ACES2065_2_HSL(out)
             np.where(out_HSL[:, :, :, 0] < 0, out_HSL[:, :, :, 0],out_HSL[:, :, :, 0] + 1)  # Normalize Hue values that wrapped around
             np.where(out_HSL[:, :, :, 0] > 1, out_HSL[:, :, :, 0], out_HSL[:, :, :, 0] - 1)
 
@@ -1097,18 +1091,20 @@ def write_lut_shaper(filename, bez_curve_lum, three_by_three,norm_lut_max,input_
             np.where(out_HSL[:, :,:, 0] < 0, out_HSL[:, :, :,0], out_HSL[:, :,:, 0] + 1)  # Normalize Hue values that wrapped around
             np.where(out_HSL[:, :,:, 0] > 1, out_HSL[:, :, :,0], out_HSL[:, :,:, 0] - 1)
             out_HSL[:, :, :,1] = out_HSL[:, :,:, 1] * interp_1d(out_HSL[:, :,:, 0],bez_curve_hue_sat)  # Apply Hue_sat Curve
-            out = HSL_2_linSRGB(out_HSL)  # Convert back to linSRGB
+            out = HSL_2_ACES2065(out_HSL)  # Convert back to linSRGB
 
-        if (expand_tone):
+
+        if (expand_tone):  # Do tone expansion in xyY space as OKlab was found to introduce artifacts.
             init_max = interp_1d(input_whitepoint, bez_curve_lum)
             t = [init_max, init_max, init_max]
-            colour.RGB_to_RGB(t, RGB_COLOURSPACE_LIN_sRGB, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,
-                              chromatic_adaptation_transform=None, apply_cctf_decoding=True, apply_cctf_encoding=False)
+            ACES2065_2_XYZ(t)
             init_max = colour.XYZ_to_xyY(t)[2]
             out = tone_map_xyY(out, inflection_percent, init_max)
 
-
-        out = linSRGB_2_DWG_I_CAT(out)
+        if (enable_optimize_illum == "O" or enable_optimize_illum == "IO"):
+            out = ACES2065_2_DWG_I_CAT(out)
+        else:
+            out = ACES2065_2_DWG_I(out)
 
         for k in range(lut_size_3d):
             for j in range(lut_size_3d):
@@ -1243,80 +1239,33 @@ def set_bez_MG(bez_count_lum, bez_values_lum, MG_bez):
 
 
 def LAB_2_XYZ (input):
-    #return colour.Lab_to_XYZ(input,illuminant=ILLUMINANT)
     return colour.Lab_to_XYZ(input)
-    #return ski.color.lab2xyz(input)
 
-def LAB_2_LinsRGB (input):
-    return XYZ_2_linSRGB(LAB_2_XYZ(input))
+
 
 def XYZ_2_LAB(input):
-   #return colour.XYZ_to_Lab(input, illuminant=ILLUMINANT)
-
    return colour.XYZ_to_Lab(input)
-   #return ski.color.xyz2lab(input)
 
-def XYZ_2_sRGB_cat(input):
-    #return colour.XYZ_to_sRGB(input)
-   #return colour.XYZ_to_sRGB(input, illuminant=ILLUMINANT, chromatic_adaptation_transform=None)
-   #return colour.XYZ_to_sRGB(input,illuminant=ILLUMINANT ,chromatic_adaptation_transform  = 'CAT02')
 
-    RGB_COLOURSPACE_sRGB_CUSTOM_WP = RGB_COLOURSPACE_sRGB.copy()
-    RGB_COLOURSPACE_sRGB_CUSTOM_WP.whitepoint = ILLUMINANT
-    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE, RGB_COLOURSPACE_sRGB_CUSTOM_WP,
-                            chromatic_adaptation_transform=CAT, apply_cctf_decoding=False, apply_cctf_encoding=True)
-
-   #return colour.XYZ_to_sRGB(input)
-   #return ski.color.xyz2rgb(input)
 
 def XYZ_2_sRGB(input):
-    #return colour.XYZ_to_sRGB(input)
-   #return colour.XYZ_to_sRGB(input, illuminant=ILLUMINANT, chromatic_adaptation_transform=None)
-   #return colour.XYZ_to_sRGB(input,illuminant=ILLUMINANT ,chromatic_adaptation_transform  = 'CAT02')
-
     return colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE, RGB_COLOURSPACE_sRGB,
                             chromatic_adaptation_transform=None, apply_cctf_decoding=False, apply_cctf_encoding=True)
 
-   #return colour.XYZ_to_sRGB(input)
-   #return ski.color.xyz2rgb(input)
 
-def sRGB_2_XYZ_CAT(input):
-    #return colour.sRGB_to_XYZ(input)
-    RGB_COLOURSPACE_sRGB_CUSTOM_WP = RGB_COLOURSPACE_sRGB.copy()
-    RGB_COLOURSPACE_sRGB_CUSTOM_WP.whitepoint = ILLUMINANT
-    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_sRGB_CUSTOM_WP, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,
-                             chromatic_adaptation_transform=CAT, apply_cctf_decoding=True,apply_cctf_encoding=False)
+def ACES2065_2_DWG_I_CAT(input):
 
-def sRGB_2_XYZ(input):
-    #return colour.sRGB_to_XYZ(input)
-    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_sRGB, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,
-                             chromatic_adaptation_transform=None, apply_cctf_decoding=True,apply_cctf_encoding=False)
+    RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP = RGB_COLOURSPACE_ACES2065_1.copy()
+    RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP.whitepoint =  ILLUMINANT
 
-
-"""def XYZ_2_DWG_I(input):
-
-    RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT_CUSTOM_WP= RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT.copy()
-    RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT_CUSTOM_WP.whitepoint = ILLUMINANT
-    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT_CUSTOM_WP,
-                      chromatic_adaptation_transform=CAT, apply_cctf_decoding=False, apply_cctf_encoding=True)"""
-
-def linSRGB_2_DWG_I_CAT(input):
-
-    RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP = RGB_COLOURSPACE_LIN_sRGB.copy()
-    RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP.whitepoint =  ILLUMINANT
-
-    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT,
+    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT,
                              chromatic_adaptation_transform=CAT, apply_cctf_decoding=False,
                              apply_cctf_encoding=True)
 
-def linSRGB_2_DWG_I(input):
 
-    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_sRGB, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT,
-                             chromatic_adaptation_transform=None, apply_cctf_decoding=False,
-                             apply_cctf_encoding=True)
-def DWG_I_2linSRGB(input):
+def ACES2065_2_DWG_I(input):
 
-    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT,RGB_COLOURSPACE_LIN_sRGB,
+    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_ACES2065_1, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT,
                              chromatic_adaptation_transform=None, apply_cctf_decoding=False,
                              apply_cctf_encoding=True)
 
@@ -1324,12 +1273,25 @@ def DWG_I_2linSRGB(input):
 def LAB_2_sRGB (input):
     return colour.XYZ_to_sRGB(LAB_2_XYZ(input))
 
-def linsRGB_2_HSL(input):
-    return XYZ_2_HSL( linSRGB_2_XYZ(input) )
+def LAB_2_HSL(input):
 
-def HSL_2_linSRGB(input):
-    return XYZ_2_linSRGB(HSL_2_XYZ(input))
+    return ACES2065_2_HSL (LAB_2_ACEC2065(input))
 
+def LAB_2_ACEC2065(input):
+    return XYZ_2_ACES2065(LAB_2_XYZ(input))
+
+def ACES2065_2_HSL(input):
+    #aces = np.clip(input, a_min=0, a_max=None)
+    #return colour.RGB_to_HSL(input)
+    return XYZ_2_HSL(ACES2065_2_XYZ(input))
+
+
+
+def HSL_2_ACES2065(input):
+
+    #return colour.HSL_to_RGB(input)
+
+    return XYZ_2_ACES2065(HSL_2_XYZ(input))
 
 def HSL_2_XYZ(input):
 
@@ -1355,60 +1317,30 @@ def XYZ_2_HSL(input):
 
 def HSL_2_LAB(input):
 
+    #return ACES2065_2_LAB(colour.HSL_to_RGB(input))
+
     return XYZ_2_LAB(HSL_2_XYZ(input))
 
 def HSL_2_sRGB(input):
-    #return colour.HSL_to_RGB(input)
-    #return colour.HSV_to_RGB(input)
-    #return colorsys.hls_to_rgb(input)
-    #return ski.color.hsv2rgb(input)
-    srgb = XYZ_2_sRGB(HSL_2_XYZ(input))
-    return srgb
 
-def HSL_2_sRGB_cat(input):
-    #return colour.HSL_to_RGB(input)
-    #return colour.HSV_to_RGB(input)
-    #return colorsys.hls_to_rgb(input)
-    #return ski.color.hsv2rgb(input)
-    srgb = XYZ_2_sRGB_cat(HSL_2_XYZ(input))
-    return srgb
+   #return ACES2065_2_REC709 (colour.HSL_to_RGB(input))
 
+    return XYZ_2_sRGB(HSL_2_XYZ(input))
 
-def sRGB_2_LinSRGB(input):
+def ACES2065_2_REC709 (input):
+    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_ACES2065_1, RGB_COLOURSPACE_BT709,
+                             chromatic_adaptation_transform=None, apply_cctf_decoding=False,apply_cctf_encoding=True)
 
-    #out = np.where(x<0.04045,(x/12.92), np.power( ((x +.055)/1.055) , 2.4))
-    out = colour.models.eotf_sRGB(input)
-    #out =  np.power(x, 2.2)
-    return out
-
-def linSRGB_2_sRGB(input):
-
-    #out = np.where(x<0.0031308,x * 12.92, np.power((x * 1.055), (1/2.4)) - .055)
-    out = colour.models.eotf_inverse_sRGB(input)
-    #out= np.power(x, 1/2.2)
-    return out
-
-
-def linSRGB_2_LAB(input):
-    return  XYZ_2_LAB(linSRGB_2_XYZ(input))
-
-
-
-def linSRGB_2_XYZ(input):
-
-    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_sRGB, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,
+def ACES2065_2_XYZ(input):
+    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_ACES2065_1, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,
                              chromatic_adaptation_transform=None, apply_cctf_decoding=False,apply_cctf_encoding=False)
 
-def XYZ_2_linSRGB (input):
+def ACES2065_2_LAB(input):
+    return XYZ_2_LAB(ACES2065_2_XYZ(input))
 
-    return colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,RGB_COLOURSPACE_LIN_sRGB,
+def XYZ_2_ACES2065 (input):
+    return colour.RGB_to_RGB(input,RGB_COLOURSPACE_LIN_CIEXYZ_SCENE, RGB_COLOURSPACE_ACES2065_1,
                              chromatic_adaptation_transform=None, apply_cctf_decoding=False,apply_cctf_encoding=False)
-
-
-
-def sRGB_2_LAB(input):
-    return XYZ_2_LAB(sRGB_2_XYZ(input))
-
 
 
 def interp_3d_setup(xyz, w):
@@ -1812,10 +1744,7 @@ def calc_charts(chip_RGB, chart_name_low,chart_name_high, bez_curve_lum=None, th
     chip_RGB_LIN[:, :, :, 2] = interp_1d(chip_RGB[:, :, :, 2], bez_curve_lum)
 
     if FLAT_RGB is not None:
-        flat_lin = FLAT_RGB.copy()
-        flat_lin[:, :, 0] = interp_1d(FLAT_RGB[:, :, 0], bez_curve_lum)  # Linearize flats
-        flat_lin[:, :, 1] = interp_1d(FLAT_RGB[:, :, 1], bez_curve_lum)
-        flat_lin[:, :, 2] = interp_1d(FLAT_RGB[:, :, 2], bez_curve_lum)
+        flat_lin = interp_1d(FLAT_RGB, bez_curve_lum)  # Linearize flats
 
         flat_lin = np.reshape(flat_lin, shape=(-1, 3))
         flat_lin_mean = [0, 0, 0]  # calc geo mean for each R, G, and B
@@ -1826,10 +1755,8 @@ def calc_charts(chip_RGB, chart_name_low,chart_name_high, bez_curve_lum=None, th
         flat_lin_mean[1] = np.exp(g.mean())
         flat_lin_mean[2] = np.exp(b.mean())
 
-        #flat_lin_mean = np.mean(flat_lin, axis=0)
 
         flat_lin_delta = flat_lin / flat_lin_mean  #How far each flat chip is from mean
-        flat_lin_delta = np.power(flat_lin_delta, FLAT_COMP_STRENGTH)  #Adjust how strong the flat compensation is
         flat_lin_delta = np.reshape(flat_lin_delta, shape=(num_chip_x, num_chip_y, 3))
 
         #print("flat_lin_mean = ", flat_lin_mean)
@@ -1838,35 +1765,38 @@ def calc_charts(chip_RGB, chart_name_low,chart_name_high, bez_curve_lum=None, th
     for i in range(chart_name_low, chart_name_high + 1):  # Normalize exposure
         if FLAT_RGB is not None:  # Apply Flat Compensation
             chip_RGB_LIN[i, :, :, 0] = chip_RGB_LIN[i, :, :, 0] / flat_lin_delta[:, :, 0]
-            chip_RGB_LIN[i, :, :, 1] = chip_RGB_LIN[i, :, :, 1] / flat_lin_delta[:, :, 2]
+            chip_RGB_LIN[i, :, :, 1] = chip_RGB_LIN[i, :, :, 1] / flat_lin_delta[:, :, 1]
             chip_RGB_LIN[i, :, :, 2] = chip_RGB_LIN[i, :, :, 2] / flat_lin_delta[:, :, 2]
+
         chip_RGB_LIN_norm[i, :, :] = chip_RGB_LIN[i, :, :] * (2 ** (-1 * i))
 
-
-    #chip_XYZ_lin_norm = np.matmul(chip_RGB_LIN_norm, three_by_three)  # Then multiply by three by three
-    chip_sRGB_lin_norm = np.matmul(chip_RGB_LIN_norm, three_by_three)  # Then multiply by three by three
+    #chip_sRGB_lin_norm = np.matmul(chip_RGB_LIN_norm, three_by_three)  # Then multiply by three by three
+    chip_ACES_2065_lin_norm = np.matmul(chip_RGB_LIN_norm, three_by_three)  # Then multiply by three by three
 
     if not INPUT_ILLUMINANT == [-1,-1]:  #Apply input illuminat compensation
 
-        RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP = RGB_COLOURSPACE_LIN_sRGB.copy()  # Apply chromatic adaption
-        RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP.whitepoint = INPUT_ILLUMINANT
-        chip_sRGB_lin_norm = colour.RGB_to_RGB(chip_sRGB_lin_norm, RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP,
-                 RGB_COLOURSPACE_LIN_sRGB,chromatic_adaptation_transform=CAT, apply_cctf_decoding=False, apply_cctf_encoding=False)
+        RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP = RGB_COLOURSPACE_ACES2065_1.copy()  # Apply chromatic adaption
+        RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP.whitepoint = INPUT_ILLUMINANT
+        chip_ACES_2065_lin_norm = colour.RGB_to_RGB(chip_ACES_2065_lin_norm,RGB_COLOURSPACE_ACES2065_1, RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP,
+                 chromatic_adaptation_transform=CAT, apply_cctf_decoding=False, apply_cctf_encoding=False)
 
     if (bez_curve_hue_hue is None)  and (bez_curve_hue_sat is None):  # Use 3x3 not hue_hue,Hue_sat
 
-        chip_LAB_norm = linSRGB_2_LAB(chip_sRGB_lin_norm)
+        #chip_LAB_norm = linSRGB_2_LAB(chip_sRGB_lin_norm)
+        chip_LAB_norm = ACES2065_2_LAB(chip_ACES_2065_lin_norm)
         #print("chip_LAB_norm = ", chip_LAB_norm)
 
 
     elif (bez_curve_hue_hue is not None) and (bez_curve_hue_sat is not None):  # Use hue_hue,Hue_sat
 
         if (s_gamma ==1 and s_gain ==1 ):  #No need to run HSL conversion as we are still at defaults
-            chip_LAB_norm = linSRGB_2_LAB(chip_sRGB_lin_norm)
+            #chip_LAB_norm = linSRGB_2_LAB(chip_sRGB_lin_norm)
+            chip_LAB_norm = ACES2065_2_LAB(chip_ACES_2065_lin_norm)
         else:
 
             #chip_HSL_norm = XYZ_2_HSL(chip_XYZ_lin_norm)
-            chip_HSL_norm = linsRGB_2_HSL(chip_sRGB_lin_norm)
+            #chip_HSL_norm = linsRGB_2_HSL(chip_sRGB_lin_norm)
+            chip_HSL_norm = ACES2065_2_HSL(chip_ACES_2065_lin_norm)
 
             #chip_HSL_norm = np.clip(chip_HSL_norm, a_min=0, a_max=None)
             chip_HSL_norm[:, :, :, 1] = chip_HSL_norm[:, :, :, 1] **(1/ s_gamma) #Apply Saturation Gamma
@@ -1989,7 +1919,7 @@ def main_color_thread(chip_RGB, bez_curve_lum, start_three_by_three, num_charts,
 #End Main Color
 
 
-def main_color(chip_RGB, bez_curve_lum, start_three_by_three, bad_chips, num_round, chart_name_low,
+def main_color(chip_RGB, bez_curve_lum, start_three_by_three, bad_chips, chart_name_low,
                                     chart_name_high, chart_weight,three_by_three_opt_iter):
 
     time_start = time.time()
@@ -2003,7 +1933,7 @@ def main_color(chip_RGB, bez_curve_lum, start_three_by_three, bad_chips, num_rou
 
     init_color_error  = calc_error_RGB(new_chip_LAB_norm, REFCHIP_LAB, ALL_CHIPS, bad_chips, "Color_all", chart_name_low,
                                       chart_name_high, chart_weight, final=0)
-    print("\nGenetic Round "+ str(num_round)+ " Initial Color-All error = ", init_color_error)
+    print("\nGenetic Initial Color-All error = ", init_color_error)
 
 
     for i in range(NUM_PARENT_C):  # setup original children
@@ -2024,7 +1954,7 @@ def main_color(chip_RGB, bez_curve_lum, start_three_by_three, bad_chips, num_rou
                 parent_three_by_three[i] = t / 2
 
         best_three_by_three = child_best_three_by_three[child_color_error_list.argmin()]
-        #print ("Best Child = ", child_color_error_list.argmin())
+        #print ("Best Child = ", child_color_error_list.argmin(), " Min error = ",np.min(child_color_error_list)  ," Max Error = ", np.max(child_color_error_list))
 
 
         chip_LAB_norm = calc_charts(chip_RGB, chart_name_low, chart_name_high, bez_curve_lum=bez_curve_lum,
@@ -2050,18 +1980,16 @@ def main_color(chip_RGB, bez_curve_lum, start_three_by_three, bad_chips, num_rou
 def three_by_three_binary(perturb_max, test_chart_RGB, chart_name_low,chart_name_high, init_three_by_three, bad_chips, chart_weight,bez_count_lum, best_bez_lum,
                           bez_count_hue_hue,bez_count_hue_sat,best_bez_hue_hue,best_bez_hue_sat,input_blackpoint,input_whitepoint,s_gain,s_gamma,input_MG, WB_Control):
 
-
-    good_chips = np.sum(bad_chips)
-
-    three_by_three_zero = init_three_by_three.astype(float)
+    three_by_three_zero = init_three_by_three.copy()
 
     error_init = error_sum(bez_count_lum, best_bez_lum, test_chart_RGB,chart_name_low, chart_name_high, three_by_three_zero, bad_chips, 'Color_all',
                             chart_weight, final=0,bez_count_hue_hue=bez_count_hue_hue, bez_count_hue_sat=bez_count_hue_sat,
                             bez_values_hue_hue=best_bez_hue_hue, bez_values_hue_sat=best_bez_hue_sat, input_blackpoint=input_blackpoint,
                            input_whitepoint=input_whitepoint, s_gain=s_gain,s_gamma=s_gamma, input_MG=input_MG)
 
+    error_zero = error_init
 
-    print("\nBinary Search Initial Color-All Error = ",error_init)
+    print("Binary Search Initial Color-All Error = ",error_init)
 
     for k in range (MAX_ITER_3X3):
         for i in range(MAX_ITER_3X3):
@@ -2074,34 +2002,34 @@ def three_by_three_binary(perturb_max, test_chart_RGB, chart_name_low,chart_name
                     match l:
                         case 0:
                             t[j] = perturb_step
-                            #t[(j + 1) % 3] = (perturb_step / - 2)
+                            t[(j + 1) % 3] = (perturb_step / - 2)
                             t[(j - 1) % 3] =  (perturb_step / - 2)
 
                         case 1:
-                            #t[j] = (perturb_step / - 2)
+                            t[j] = (perturb_step / - 2)
                             t[(j + 1) % 3] = perturb_step
-                            #t[(j - 1) % 3] = (perturb_step / - 2)
+                            t[(j - 1) % 3] = (perturb_step / - 2)
 
                         case 2:
-                            #t[j] = (perturb_step / - 2)
-                            #t[(j + 1) % 3] = (perturb_step / - 2)
+                            t[j] = (perturb_step / - 2)
+                            t[(j + 1) % 3] = (perturb_step / - 2)
                             t[(j - 1) % 3] = perturb_step
 
                     three_by_three_up[:, j] = three_by_three_up[:, j] + t
-                    if np.sum(three_by_three_up) != 0: three_by_three_up = three_by_three_up / (np.sum(three_by_three_up) /3)  #force sum to 1
+                    #if np.sum(three_by_three_up) != 0: three_by_three_up = three_by_three_up / (np.sum(three_by_three_up) /3)  #force sum to 1
 
                     three_by_three_down[:, j] = three_by_three_down[:, j] - t
-                    if np.sum(three_by_three_down) != 0: three_by_three_down = three_by_three_down / (np.sum(three_by_three_down) / 3)  # force sum to 1
+                    #if np.sum(three_by_three_down) != 0: three_by_three_down = three_by_three_down / (np.sum(three_by_three_down) / 3)  # force sum to 1
 
 
 
 
-                    error_zero= error_sum(bez_count_lum, best_bez_lum, test_chart_RGB, chart_name_low, chart_name_high,
+                    """error_zero= error_sum(bez_count_lum, best_bez_lum, test_chart_RGB, chart_name_low, chart_name_high,
                                 three_by_three_zero, bad_chips, 'Color_all',
                                 chart_weight, final=0, bez_count_hue_hue=bez_count_hue_hue, bez_count_hue_sat=bez_count_hue_sat,
                                 bez_values_hue_hue=best_bez_hue_hue, bez_values_hue_sat=best_bez_hue_sat,
                                 input_blackpoint=input_blackpoint,
-                                input_whitepoint=input_whitepoint, s_gain=s_gain, s_gamma=s_gamma, input_MG=input_MG)
+                                input_whitepoint=input_whitepoint, s_gain=s_gain, s_gamma=s_gamma, input_MG=input_MG)"""
 
                     error_up = error_sum(bez_count_lum, best_bez_lum, test_chart_RGB, chart_name_low, chart_name_high,
                                            three_by_three_up, bad_chips, 'Color_all',
@@ -2125,8 +2053,10 @@ def three_by_three_binary(perturb_max, test_chart_RGB, chart_name_low,chart_name
                         pass
                     elif error_up < error_down:
                         three_by_three_zero = three_by_three_up.copy()
+                        error_zero = error_up
                     else:
                         three_by_three_zero = three_by_three_down.copy()
+                        error_zero = error_down
 
 
     error_final = error_sum(bez_count_lum, best_bez_lum, test_chart_RGB, chart_name_low, chart_name_high,
@@ -2136,7 +2066,7 @@ def three_by_three_binary(perturb_max, test_chart_RGB, chart_name_low,chart_name
                            bez_values_hue_hue=best_bez_hue_hue, bez_values_hue_sat=best_bez_hue_sat,
                            input_blackpoint=input_blackpoint,
                            input_whitepoint=input_whitepoint, s_gain=s_gain, s_gamma=s_gamma, input_MG=input_MG)
-    print ("\nBinary Search Final Color-All Error = ", error_final)
+    print ("Binary Search Final Color-All Error = ", error_final)
     print(three_by_three_zero)
 
     return three_by_three_zero
@@ -2229,7 +2159,9 @@ def peturb_color_three_by_three(parent_num, generation, chip_RGB, refchip_lab, b
                                 bez_curve,chart_name_low, chart_name_high,chart_weight):
 
     peturb_max = PETURB_MAX_C / (2**generation)
-    #peturb_max = peturb_max * ((parent_num+1) / NUM_PARENT_C)
+    peturb_max = peturb_max * ((parent_num+1) / NUM_PARENT_C)
+
+    #print ("peturb_max = " , peturb_max)
 
     num_children = NUM_CHILDREN_C
     color_chips = ALL_CHIPS
@@ -2241,7 +2173,7 @@ def peturb_color_three_by_three(parent_num, generation, chip_RGB, refchip_lab, b
     min_error = calc_error_RGB(new_chip_LAB_norm, refchip_lab, color_chips, bad_chips, "Color_all",
                            chart_name_low, chart_name_high, chart_weight, final=0)
 
-    seed = 593 + (parent_num * 1847) + (generation *  	2111)
+    seed = 593 + (parent_num * 1847) + (generation * 2111)
     rng = np.random.default_rng(seed=seed)
 
     for c in range(num_children):
@@ -2284,10 +2216,20 @@ def disp_chart(bez_curve,three_by_three,bez_curve_hue_hue,bez_curve_hue_sat,s_ga
             image_lin[:, :, 2] = interp_1d(image[:, :, 2], bez_curve)
 
             image_lin_norm = image_lin * (2 ** (-1 * exp_shift))
-            image_lin_sRGB_norm = np.matmul(image_lin_norm, three_by_three)  # Then multiply by three by three
+            #image_lin_sRGB_norm = np.matmul(image_lin_norm, three_by_three)  # Then multiply by three by three
+            image_ACES2065_lin_norm = np.matmul(image_lin_norm, three_by_three)  # Then multiply by three by three
 
-            image_lin_sRGB_norm = np.clip(image_lin_sRGB_norm, a_min=0, a_max=1)
-            image_HSL_Norm = linsRGB_2_HSL(image_lin_sRGB_norm)
+            if not INPUT_ILLUMINANT == [-1, -1]:  # Apply input illuminat compensation
+
+                RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP = RGB_COLOURSPACE_ACES2065_1.copy()  # Apply chromatic adaption
+                RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP.whitepoint = INPUT_ILLUMINANT
+                image_ACES2065_lin_norm = colour.RGB_to_RGB(image_ACES2065_lin_norm, RGB_COLOURSPACE_ACES2065_1,
+                                                       RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP,
+                                                       chromatic_adaptation_transform=CAT, apply_cctf_decoding=False,
+                                                       apply_cctf_encoding=False)
+
+            image_ACES2065_lin_norm = np.clip(image_ACES2065_lin_norm, a_min=0, a_max=1)
+            image_HSL_Norm = ACES2065_2_HSL(image_ACES2065_lin_norm)
 
             image_HSL_Norm = np.clip(image_HSL_Norm, a_min=0, a_max=None)
             image_HSL_Norm[:, :, 1] = image_HSL_Norm[:, :, 1] ** (1 / s_gamma)  # Apply Saturation Gamma
@@ -2301,11 +2243,7 @@ def disp_chart(bez_curve,three_by_three,bez_curve_hue_hue,bez_curve_hue_sat,s_ga
 
             image_SRGB_Norm = HSL_2_sRGB(image_HSL_Norm)  # Convert back to sRGB
 
-            """RGB_COLOURSPACE_sRGB_CUSTOM_WP = RGB_COLOURSPACE_LIN_sRGB.copy()
-            RGB_COLOURSPACE_sRGB_CUSTOM_WP.whitepoint = ILLUMINANT
-            image_SRGB_Norm = colour.RGB_to_RGB(image_SRGB_Norm, RGB_COLOURSPACE_sRGB_CUSTOM_WP, RGB_COLOURSPACE_sRGB,
-                                     chromatic_adaptation_transform=CAT, apply_cctf_decoding=False,
-                                     apply_cctf_encoding=False)"""
+
 
             image_SRGB_Norm = np.clip(image_SRGB_Norm, a_min=0, a_max=1)
             export_filename = (str(filename).removesuffix('.png') + "_corrected.png")
@@ -2337,13 +2275,21 @@ def disp_chart_single(bez_curve,three_by_three,test_chart_RGB,bez_curve_hue_hue,
         image_lin[:, :, 1] = interp_1d(test_chart_RGB[0,:, :, 1], bez_curve)
         image_lin[:, :, 2] = interp_1d(test_chart_RGB[0,:, :, 2], bez_curve)
 
-        #image_2020_lin = np.matmul(image_lin, three_by_three)  # Then multiply by three by three
 
-        image_lin_sRGB = np.matmul(image_lin, three_by_three)
+        image_ACES2065_lin = np.matmul(image_lin, three_by_three) # Then multiply by three by three
 
-        image_lin_sRGB = np.clip(image_lin_sRGB, a_min=0, a_max=1)
+        if not INPUT_ILLUMINANT == [-1, -1]:  # Apply input illuminat compensation
 
-        image_HSL_Norm = linsRGB_2_HSL(image_lin_sRGB)
+            RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP = RGB_COLOURSPACE_ACES2065_1.copy()  # Apply chromatic adaption
+            RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP.whitepoint = INPUT_ILLUMINANT
+            image_ACES2065_lin = colour.RGB_to_RGB(image_ACES2065_lin, RGB_COLOURSPACE_ACES2065_1,
+                                                    RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP,
+                                                    chromatic_adaptation_transform=CAT, apply_cctf_decoding=False,
+                                                    apply_cctf_encoding=False)
+
+        image_ACES2065_lin = np.clip(image_ACES2065_lin, a_min=0, a_max=1)
+
+        image_HSL_Norm = ACES2065_2_HSL(image_ACES2065_lin)
 
 
         image_HSL_Norm = np.clip(image_HSL_Norm, a_min=0, a_max=None)
@@ -2358,14 +2304,6 @@ def disp_chart_single(bez_curve,three_by_three,test_chart_RGB,bez_curve_hue_hue,
 
         image_SRGB_Norm = HSL_2_sRGB(image_HSL_Norm)  # Convert back to sRGB
 
-
-
-        """RGB_COLOURSPACE_sRGB_CUSTOM_WP = RGB_COLOURSPACE_sRGB.copy()
-        RGB_COLOURSPACE_sRGB_CUSTOM_WP.whitepoint = ILLUMINANT
-        image_SRGB_Norm = colour.RGB_to_RGB(image_SRGB_Norm, RGB_COLOURSPACE_sRGB_CUSTOM_WP,
-                                            RGB_COLOURSPACE_sRGB,
-                                            chromatic_adaptation_transform=CAT, apply_cctf_decoding=False,
-                                            apply_cctf_encoding=False)"""
 
         image_SRGB_Norm = np.clip(image_SRGB_Norm, a_min=0, a_max=1)
         export_img = (image_SRGB_Norm * 255).astype(np.uint8)
@@ -2428,34 +2366,16 @@ def printcurves(bez_count_lum, best_bez_lum, best_three_by_three,input_blackpoin
 
     y = np.linspace(0, input_whitepoint, 500)
 
+    debevec_values= debevec_curve(y)
+    debevec_values = np.power(debevec_values, 1/2.4)  #Apply gamma 2.4 to compare with REC709
+
     l = interp_1d(y, bez_curve_lum)
     l = np.clip(l, a_min=0, a_max=None)
-
-    debevec_values= debevec_curve(y)
-    debevec_values = np.power(debevec_values, 1/2.2)
-
-    mult =    np.matmul((1,1,1), best_three_by_three)
-    rgb = (l * mult[0], l * mult[1], l * mult[2])
-
-    l = (l, l, l)
-    l = linSRGB_2_sRGB(l)
+    l = np.power(l, 1/2.4)  #Apply gamma 2.4 to compare with REC709
 
 
-    rgb = np.transpose(rgb)
-
-    RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP = RGB_COLOURSPACE_LIN_sRGB.copy()
-    RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP.whitepoint = ILLUMINANT
-
-
-    rgb = colour.RGB_to_RGB(rgb, RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP, RGB_COLOURSPACE_sRGB,
-                          chromatic_adaptation_transform=CAT, apply_cctf_decoding=False,
-                          apply_cctf_encoding=True)
-
-    plt.title("Bez curves, Cyan is Debevec fit")
-    plt.plot(y, l[0,:], 'k')
-    plt.plot(y, rgb[:,0], 'r')
-    plt.plot(y, rgb[:,1], 'g')
-    plt.plot(y, rgb[:,2], 'b')
+    plt.title("Bez curves, Cyan is Debevec fit, Black custom fit")
+    plt.plot(y, l, 'k')
     plt.plot(y, debevec_values, 'c')
     plt.savefig('data/results/luma_curve.png')
     plt.show()
@@ -2863,7 +2783,7 @@ def sat_max(bez_count_lum, best_bez_lum, three_by_three,input_blackpoint,input_w
 
     #print ("RGB = ", rgb)
 
-    hsl = XYZ_2_HSL(rgb)
+    hsl = ACES2065_2_HSL(rgb)
 
     #print ("HSL = ", hsl)
 
@@ -2877,7 +2797,7 @@ def sat_max(bez_count_lum, best_bez_lum, three_by_three,input_blackpoint,input_w
     test_chart_LAB_norm = calc_charts(test_chart_RGB, chart_name_low, chart_name_high, bez_curve_lum=bez_curve_lum,
                                       three_by_three=three_by_three )
 
-    test_chart_HSL = XYZ_2_HSL(LAB_2_XYZ(test_chart_LAB_norm))
+    test_chart_HSL =  LAB_2_HSL(test_chart_LAB_norm)
     max = np.max(test_chart_HSL[:, :, :, 1])
     location = np.unravel_index(np.argmax(test_chart_HSL[:, :, :, 1]), test_chart_HSL[:, :, :, 1].shape)
     print("Sat Max Actual = ", max, " at ",location)
@@ -3055,24 +2975,24 @@ def tone_map_xyY(input,inflection_percent,init_max):
 
 def wb_error(three_by_three,print_results, s_gamma,s_gain, bez_curve_hue_hue,bez_curve_hue_sat):
     input = [MIDDLE_GRAY_LIN,MIDDLE_GRAY_LIN,MIDDLE_GRAY_LIN]
-    linSRGB = np.matmul(input,three_by_three)
+    ACES2065_rgb = np.matmul(input,three_by_three)
     #print ("LinSRGB= ", linSRGB)
     if  not (s_gamma ==1 and s_gain ==1):
-        HSL = linsRGB_2_HSL(linSRGB)
+        HSL = ACES2065_2_HSL(ACES2065_rgb)
         #print ("HSL = ", HSL)
         HSL[ 1] = HSL[ 1] ** (1 / s_gamma)  # Apply Saturation Gamma
         HSL[1] = HSL[1] * s_gain  # Apply Saturation Gain
         HSL[ 0] = HSL[ 0] + interp_1d(HSL[0],bez_curve_hue_hue)  # Apply Hue_hue Curve
         HSL[ 1] = HSL[1] * interp_1d(HSL[ 0], bez_curve_hue_sat)  # Apply Hue_sat Curve
         #print("HSL = ", HSL)
-        linSRGB = HSL_2_linSRGB(HSL)  # Convert back to sRGB
+        ACES2065_rgb = HSL_2_ACES2065(HSL)  # Convert back to sRGB
     #print("LinSRGB= ", linSRGB)
 
-    DWG = linSRGB_2_DWG_I_CAT(linSRGB)
+    DWG = ACES2065_2_DWG_I_CAT(ACES2065_rgb)
 
     if np.min(DWG) <= 0: error = 100
     else: error = (np.max(DWG)**2/np.min(DWG)**2) - 1
-    if print_results : print ( "White point error, DWG= ", DWG)
+    if print_results : print ( "White point error, DWG values = ", DWG)
 
     #print("ILLUMINANT = ",  ILLUMINANT, " linSRGB = ", linSRGB," DWG = ", DWG, " Error = ", error)
 
@@ -3197,37 +3117,6 @@ def optimize_ouput_illum( three_by_three, s_gamma,s_gain, bez_curve_hue_hue,bez_
     print("Optimized Output Illum = ", f'{ILLUMINANT[0]:.8f}', ",",f'{ILLUMINANT[1]:.8f}'," Temp = ", temperature,  " Final Error = ",final_error)
     return illum_zero
 
-
-
-def matrix_fit(bez_count_lum, best_bez_lum, input_blackpoint,input_whitepoint, input_MG,test_chart_RGB):
-
-    degree = 2
-
-    bez_curve_lum = interp_1d_setup(bez_count_lum, best_bez_lum[:, 1], hue=0, input_blackpoint=input_blackpoint,
-                                    input_whitepoint=input_whitepoint, input_MG=input_MG)
-    m_t = test_chart_RGB[0].copy()
-    m_t = np.reshape(m_t, shape=(-1, 3))
-    m_t[:, 0] = interp_1d(m_t[:, 0], bez_curve_lum)
-    m_t[:, 1] = interp_1d(m_t[:, 1], bez_curve_lum)
-    m_t[:, 2] = interp_1d(m_t[:, 2], bez_curve_lum)
-    m_r = np.reshape(REFCHIP_LAB, shape=(-1, 3))
-    m_r = LAB_2_LinsRGB(m_r)
-    matrix = colour.characterisation.matrix_colour_correction_Finlayson2015(m_t, m_r, degree=degree)
-    x = [[1,0,0],[0,1,0],[0,0,1]]
-    three_by_three = colour.characterisation.apply_matrix_colour_correction_Finlayson2015(x, matrix, degree= degree)
-    print("Finlayson2015 Matrix = \n", matrix, "\n3x3 = \n",three_by_three )
-
-    m_t_corrected = colour.characterisation.apply_matrix_colour_correction_Finlayson2015(m_t, matrix, degree= degree)
-    m_t_LAB = linSRGB_2_LAB(m_t_corrected)
-    m_r_LAB = np.reshape(REFCHIP_LAB, shape=(-1, 3))
-
-    deltae = colour.difference.delta_E_CIE2000(m_t_LAB, m_r_LAB)
-    print("\nMean Error = ", np.mean(deltae), " Median error = ", np.median(deltae))
-    print("Max error = ", np.max(deltae), " Min Error = ", np.min(deltae))
-    return three_by_three
-
-
-
 def optimize_input_illum(test_chart_RGB, chart_name_low, chart_name_high,bez_curve_lum, three_by_three):
     global INPUT_ILLUMINANT
 
@@ -3301,19 +3190,24 @@ def optimize_input_illum(test_chart_RGB, chart_name_low, chart_name_high,bez_cur
 
 
 def input_illum_error(test_chart_lin,three_by_three, test_illum, inv_matrix):
-    test_chart_sRGB_lin = np.matmul(test_chart_lin[0], three_by_three)  # Then multiply by three by three
 
-    RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP = RGB_COLOURSPACE_LIN_sRGB.copy()  #Apply chromatic adaption
-    RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP.whitepoint = test_illum
-    test_chart_sRGB_lin = colour.RGB_to_RGB(test_chart_sRGB_lin, RGB_COLOURSPACE_LIN_sRGB_CUSTOM_WP,
-                                            RGB_COLOURSPACE_LIN_sRGB,
-                                            chromatic_adaptation_transform=CAT, apply_cctf_decoding=False,
+
+    test_chart_ACES2065_lin = np.matmul(test_chart_lin[0], three_by_three)  # Then multiply by three by three
+
+    RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP = RGB_COLOURSPACE_ACES2065_1.copy()  #Apply chromatic adaption
+    RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP.whitepoint = test_illum
+    test_chart_ACES2065_lin = colour.RGB_to_RGB(test_chart_ACES2065_lin, RGB_COLOURSPACE_ACES2065_1,RGB_COLOURSPACE_ACES2065_1_CUSTOM_WP
+                                            ,chromatic_adaptation_transform=CAT, apply_cctf_decoding=False,
                                             apply_cctf_encoding=False)
-    invert_sRGB_lin = np.matmul(test_chart_sRGB_lin, inv_matrix)
-    invert_LAB = linSRGB_2_LAB(invert_sRGB_lin)
-    A = invert_LAB[:,:,1] * WB_CHIPS  #Filter out to only neutral chips
-    B = invert_LAB[:,:,2] * WB_CHIPS
+    invert_ACES2065_lin = np.matmul(test_chart_ACES2065_lin, inv_matrix)
+
+    test = ACES2065_2_LAB(invert_ACES2065_lin)
+
+    A = test[:,:,1] * WB_CHIPS #Filter out to only neutral chips
+    B = test[:,:,2] *  WB_CHIPS
     return np.mean(A ** 2 + B ** 2)  #Calculate the mean Chroma
+    #return (abs(np.sum(A)) + abs(np.sum(B))) / np.sum(WB_CHIPS) #Calculate the mean Chroma
+
 
 def calc_dr(test_chart, chart_name_low, chart_name_high, bez_curve_lum, input_whitepoint):
 
@@ -3328,8 +3222,9 @@ def calc_dr(test_chart, chart_name_low, chart_name_high, bez_curve_lum, input_wh
     for n in range (chart_name_low, chart_name_high):  #Find what chart is slightly brighter
         value = test_chart[n,darkest_chip[1],darkest_chip[2],darkest_chip[3] ]
         value_lin = interp_1d(value, bez_curve_lum)
+        value_lin = np.clip(value_lin, a_min=2 ** -15, a_max=None)
         #print ("Chart N ", n, " Test Value_lin = ", value_lin)
-        if value_lin> darkest_value_lin *1.25:
+        if value_lin> darkest_value_lin *2:
             #print("n = ", n," value_lin = ",value_lin)
             break
 
@@ -3374,34 +3269,25 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--enable_optimize_illum",
-        default=1,
+        default="IO",
         required=False,
-        type=int,
-        help="Set to 1 perform input Illuminate optimization, default = 1",
+        type=str,
+        help="Set to \"I\" perform input Illuminate optimization only, \"O\" to perform output optimization only, or \"IO\" for both,  default = \"IO\"",
     )
     parser.add_argument(
         "--gammut_comp",
-        default=1,
+        default=0,
         required=False,
         type=int,
         help="Set to 1 to apply ACES gammut compression on resulting lut, 2 to use DWG color Space, 0 off",
     )
     parser.add_argument(
         "--expand_tone",
-        default=1,
+        default=0,
         required=False,
         type=int,
         help="0 = off, 1 = expand so Input_whitepoint is DWG/I max",
     )
-
-    parser.add_argument(
-        "--expand_shadow",
-        default=0,
-        required=False,
-        type=int,
-        help="0 = off, 1 = to raise shadows slightly to reduce negative values sent to LUT",
-    )
-
     parser.add_argument(
         "--inflection_percent",
         default=0,
@@ -3410,15 +3296,22 @@ if __name__ == '__main__':
         help="when expand_tone is on, where to start expansion, 0 even across tone range (pure gain), 1.0 at nearly max luma (harsh), Default = 0.5",
     )
     parser.add_argument(
-        "--print_input_charts",
+        "--expand_shadow",
         default=0,
+        required=False,
+        type=int,
+        help="0 = off, 1 = to raise shadows slightly to reduce negative values sent to LUT",
+    )
+    parser.add_argument(
+        "--print_input_charts",
+        default=1,
         required=False,
         type=int,
         help="Set to 1 for input charts to be displayed back to confirm they were read correctly",
     )
     parser.add_argument(
         "--print_ref_chart",
-        default=0,
+        default=1,
         required=False,
         type=int,
         help="Set to 1 for ground truth chart to be displayed back to confirm they were read correctly",
@@ -3470,21 +3363,21 @@ if __name__ == '__main__':
         default=6,
         required=False,
         type=int,
-        help="number of bezier points in hue-hue curve model, default 7",
+        help="number of bezier points in hue-hue curve model, default 6",
     )
     parser.add_argument(
         "--bez_count_hue_sat",
         default=6,
         required=False,
         type=int,
-        help="number of bezier points in hue-sat curve model, default 7",
+        help="number of bezier points in hue-sat curve model, default 6",
     )
     parser.add_argument(
         "--max_gen_lum",
-        default=6,
+        default=4,
         required=False,
         type=int,
-        help="how many iterations run the genetic algorithm, default 6",
+        help="how many iterations run the genetic algorithm, default 4",
     )
     parser.add_argument(
         "--lum_opt_iter",
@@ -3495,7 +3388,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--three_by_three_opt_iter",
-        default=2,
+        default=5,
         required=False,
         type=int,
         help="how many iterations on  genetic three_by_three optimizations",
@@ -3509,21 +3402,21 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--hue_loop_iter",
-        default=2,
+        default=0,
         required=False,
         type=int,
         help="how many iterations on repeat the entire Hue-Hue, Hue-Sat loop",
     )
     parser.add_argument(
         "--hue_hue_opt_iter",
-        default=1,
+        default=0,
         required=False,
         type=int,
         help="how many iterations on hue_hue curve optimizations",
     )
     parser.add_argument(
         "--hue_sat_opt_iter",
-        default=1,
+        default=0,
         required=False,
         type=int,
         help="how many iterations on Hue-sat curve optimizations",
@@ -3547,13 +3440,6 @@ if __name__ == '__main__':
         required=False,
         type=float,
         help="How low to accept input chips as not clipped, as ratio of actual minimum seen, default = 0.03",
-    )
-    parser.add_argument(
-        "--WB_Control",
-        default=1,
-        required=False,
-        type=int,
-        help="Minimize WB Shift in three_by_three, run disabled first and choose best illuminant",
     )
 
     args = parser.parse_args()

@@ -154,5 +154,7 @@ CHIP_Y0 = 0.102
 CHIP_XDELTA = 0.0865
 CHIP_YDELTA = 0.06126
 
+CHIP_SAFE_AREA = 0.15 #What % of chip x/y is safe for use in model.
+
 #ILLUMINANT = "D55"   #Choose to match Illuinant of test chart LAB values {“A”, “B”, “C”, “D50”, “D55”, “D65”, “D75”, “E”},
 
