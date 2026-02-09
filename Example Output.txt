@@ -1,0 +1,226 @@
+C:\Users\Zeb\Documents\Python\LogLin3\.venv\Scripts\python.exe "C:\Users\Zeb\Documents\Python\LogLin3\Main LAB.py" --debevec_fit 1 --bez_count_lum 15 --gammut_comp 0 --DWG_I_lut 1 --max_gen_lum 5 --lum_opt_iter 3 --three_by_three_opt_iter 6 --hue_loop_iter 0 --hue_hue_opt_iter 0 --hue_sat_opt_iter 0 --expand_tone 0 --expand_shadow 0 --inflection_percent 0.5 --black_clipping_point 0.01 --white_clipping_point 0.99 --chart_weight 2 --print_input_charts 0 --print_ref_chart 0 --enable_optimize_illum IO --fit_mode CALC 
+Namespace(fit_mode='CALC', rec709_lut=0, DWG_I_lut=1, debevec_fit=1, enable_optimize_illum='IO', gammut_comp=0, expand_tone=0, inflection_percent=0.5, expand_shadow=0, print_input_charts=0, print_ref_chart=0, print_proof_charts=1, print_curves=1, chart_weight=2, disp_chip_pixel_loc=0, lut_name='final_lut', bez_count_lum=15, bez_count_hue_hue=6, bez_count_hue_sat=6, max_gen_lum=5, lum_opt_iter=3, three_by_three_opt_iter=6, sat_opt_iter=5, hue_loop_iter=0, hue_hue_opt_iter=0, hue_sat_opt_iter=0, seed_lut_name='initial_LUT.cube', white_clipping_point=0.99, black_clipping_point=0.01)
+ Reading input charts 
+Found file  data\0.png data\1.png data\2.png data\3.png data\0.png data\-1.png data\-2.png data\-3.png data\-4.png data\-5.png 
+
+Reading file -5 -4 -3 -2 -1 0 1 2 3 
+Number of Samples in test charts =  (9, 10, 14, 3)
+Flat mean =  [ 0.8235  0.8135  0.7886]  Flat Max =  [ 0.8498  0.8407  0.8161]  Flat min =  [ 0.7833  0.7723  0.748 ]  Delta =  [ 0.0807  0.0841  0.0864]
+Input Blackpoint =  0.00102939709257  Whitepoint =  0.999057428419  Middle Gray =  0.475483454315
+Total number of non-clipped chips =  1166.0
+
+Debevec Bez values =  [-0.0391  0.      0.0063  0.0156  0.0299  0.0506  0.0852  0.1371  0.18
+  0.332   0.5241  0.7895  1.2819  1.9161  2.9359  4.4054  4.4054]
+
+Luma 1 Error =  1.90084472721 Luma 2 Error =  0.543688880271
+
+Genetic Initial Color-All error =  5.47896778381
+Final Color-All error =  2.33068188402
+[[ 0.6511 -0.0579 -0.1068]
+ [ 0.1465  1.0821 -0.0563]
+ [ 0.121  -0.0869  1.3072]]
+
+
+Generation = 1 of 5 Min Luma Error = 0.540390222066
+Time Remaining 1.152356465657552e-06 mins
+Generation = 2 of 5 Min Luma Error = 0.400045207028
+Time Remaining 0.5982173601786296 mins
+Generation = 3 of 5 Min Luma Error = 0.379359294076
+Time Remaining 0.44063788652420044 mins
+Generation = 4 of 5 Min Luma Error = 0.364183954245
+Time Remaining 0.2919480562210083 mins
+Generation = 5 of 5 Min Luma Error = 0.363551018054
+Time Remaining 0.1465188145637512 mins
+
+Best Luma Bez  =  [-0.0294  0.      0.0057  0.0147  0.0288  0.0497  0.0826  0.1339  0.18
+  0.3305  0.522   0.8079  1.2528  1.9251  2.9448  4.058   5.0378]
+Luma 1 Error =  2.39580825857 Luma 2 Error =  0.337697849773 
+
+Binary Search Initial Color-All Error =  2.28595478643
+Binary Search Final Color-All Error =  1.66676557201
+[[ 0.675  -0.0244  0.0002]
+ [ 0.2109  1.1074 -0.3223]
+ [ 0.0328 -0.1457  1.4661]]
+
+Binary Search round  1  of  3
+Luma 1 Error =  2.15655959164 Luma 2 Error =  0.348781311852
+Binary Search Best Luma Bez  =  [-0.0276  0.      0.0057  0.0147  0.0288  0.0497  0.0826  0.1339  0.18
+  0.3305  0.522   0.8079  1.2528  1.9251  2.9448  4.058   5.0378]
+Round  1 Luma 1 Error =  2.15649890827 Luma 2 Error =  0.348772591091
+
+Genetic Initial Color-All error =  1.66626585237
+Final Color-All error =  1.49352511386
+[[ 0.6733 -0.0224  0.0004]
+ [ 0.2258  1.1205 -0.3444]
+ [ 0.0075 -0.1702  1.5095]]
+
+
+Binary Search Initial Color-All Error =  1.49352511386
+Binary Search Final Color-All Error =  1.47908597424
+[[ 0.6951 -0.0112  0.0108]
+ [ 0.2243  1.134  -0.3514]
+ [-0.0128 -0.1949  1.5061]]
+
+Binary Search round  2  of  3
+Luma 1 Error =  2.24371582371 Luma 2 Error =  0.35928028899
+Binary Search Best Luma Bez  =  [-0.036   0.      0.0057  0.0147  0.0288  0.0497  0.0826  0.1339  0.18
+  0.3304  0.5218  0.8075  1.2523  1.9244  2.9448  4.058   5.0378]
+Round  2 Luma 1 Error =  2.24667376969 Luma 2 Error =  0.358890924399
+
+Genetic Initial Color-All error =  1.4809240709
+Final Color-All error =  1.47151934771
+[[ 0.6965 -0.0118  0.0083]
+ [ 0.2242  1.1375 -0.3506]
+ [-0.0173 -0.2006  1.5137]]
+
+
+Binary Search Initial Color-All Error =  1.47151934771
+Binary Search Final Color-All Error =  1.46909320952
+[[ 0.6967 -0.0097  0.0124]
+ [ 0.2246  1.1358 -0.3623]
+ [-0.0178 -0.2009  1.5212]]
+
+Binary Search round  3  of  3
+Luma 1 Error =  2.42539756837 Luma 2 Error =  0.381961670182
+Binary Search Best Luma Bez  =  [-0.0382  0.      0.0057  0.0147  0.0288  0.0497  0.0826  0.1339  0.18
+  0.3303  0.5216  0.8073  1.252   1.9239  2.9448  4.058   5.0378]
+Round  3 Luma 1 Error =  2.42756292093 Luma 2 Error =  0.381795882227
+
+Genetic Initial Color-All error =  1.46959538644
+Final Color-All error =  1.46948028944
+[[ 0.6969 -0.0092  0.0125]
+ [ 0.2247  1.1351 -0.3623]
+ [-0.0187 -0.2009  1.5219]]
+
+
+
+Initial Input Illuminat =  (0.31272, 0.32903)  Temp =  6506.56787157  Error =  25.2463821325
+Final Input Illuminat =  (0.2938707161458333, 0.30492762369791665)  Temp =  8220.43304443  Error =  3.07554853313
+
+Running Optimization loop again with new input illuminant
+Binary Search Initial Color-All Error =  6.04497890608
+Binary Search Final Color-All Error =  4.67535885706
+[[ 1.0681  0.1953  0.0962]
+ [ 0.3069  1.3554 -0.486 ]
+ [-0.4722 -0.6256  1.5618]]
+
+Binary Search round  1  of  3
+Luma 1 Error =  3.5610038191 Luma 2 Error =  0.460126408725
+Binary Search Best Luma Bez  =  [-0.0535  0.      0.006   0.0147  0.0288  0.0497  0.0826  0.1337  0.18
+  0.3291  0.52    0.805   1.2499  1.9228  2.9448  4.058   5.0378]
+Round  1 Luma 1 Error =  3.56250813508 Luma 2 Error =  0.450014943556
+
+Genetic Initial Color-All error =  4.68676224429
+Final Color-All error =  1.76074665802
+[[ 0.9792  0.1389  0.1127]
+ [ 0.2822  1.2664 -0.4117]
+ [-0.2779 -0.4065  1.3168]]
+
+
+Binary Search Initial Color-All Error =  1.76074665802
+Binary Search Final Color-All Error =  1.57514210444
+[[ 0.8099  0.0029  0.0139]
+ [ 0.3865  1.3532 -0.2948]
+ [-0.213  -0.3572  1.2986]]
+
+Binary Search round  2  of  3
+Luma 1 Error =  1.91504601772 Luma 2 Error =  0.412611431872
+Binary Search Best Luma Bez  =  [-0.0433  0.      0.0057  0.0147  0.0288  0.0497  0.0826  0.1337  0.18
+  0.3293  0.5202  0.8053  1.2499  1.9228  2.9448  4.058   5.0378]
+Round  2 Luma 1 Error =  1.90014643132 Luma 2 Error =  0.408750730607
+
+Genetic Initial Color-All error =  1.57021781991
+Final Color-All error =  1.5051884744
+[[ 0.8095  0.0084  0.0123]
+ [ 0.3828  1.3245 -0.277 ]
+ [-0.2016 -0.3278  1.269 ]]
+
+
+Binary Search Initial Color-All Error =  1.5051884744
+Binary Search Final Color-All Error =  1.46805938908
+[[ 0.7847 -0.0065  0.0082]
+ [ 0.3407  1.2882 -0.2901]
+ [-0.1347 -0.2767  1.2861]]
+
+Binary Search round  3  of  3
+Luma 1 Error =  1.6318195097 Luma 2 Error =  0.398782938818
+Binary Search Best Luma Bez  =  [-0.0517  0.      0.0057  0.0147  0.0288  0.0497  0.0826  0.1337  0.18
+  0.3296  0.5206  0.8059  1.2499  1.9228  2.9448  4.058   5.0378]
+Round  3 Luma 1 Error =  1.63206668429 Luma 2 Error =  0.397545740932
+
+Genetic Initial Color-All error =  1.46940913459
+Final Color-All error =  1.46234608695
+[[ 0.7855 -0.0068  0.0089]
+ [ 0.3432  1.2904 -0.2901]
+ [-0.1352 -0.2778  1.2818]]
+
+
+
+Total Time (s) =  98.54368734359741
+
+Final Color-All Error W/3x3 =  1.46234608695  Combined Error =  2.06078712746
+Sat Max Theoretical =  2.90312911863  at ( 0.00102939709257 , 0.832719423198 , 0.999057428419 )
+Sat Max Actual =  0.754549224891  at  (6, 3, 4)
+
+Total Time (s) =  98.55359363555908
+Error Table
++--------------------------------------------------------------------------+
+| [ 4.3613  1.8831  2.2101  2.1631  1.9134  1.9929  2.9292  1.2465  2.8785 |
+|                  1.9936  2.0892  2.695   1.6353  3.4486]                 |
++--------------------------------------------------------------------------+
+| [ 3.5059  1.6441  1.6647  4.008   1.3119  2.1761  1.8551  2.468   2.0026 |
+|                  0.5321  1.0811  2.5969  3.3912  1.6201]                 |
++--------------------------------------------------------------------------+
+| [ 1.6594  2.0035  2.5138  2.132   1.9911  4.0422  2.5502  1.9162  0.6554 |
+|                  1.7995  0.7197  3.9933  1.6009  1.9234]                 |
++--------------------------------------------------------------------------+
+| [ 2.2088  3.1238  2.1765  0.7947  4.3908  1.513   4.5881  1.3264  2.6771 |
+|                  0.8667  2.7845  2.0161  4.5757  1.915 ]                 |
++--------------------------------------------------------------------------+
+| [ 1.5319  3.5881  1.4087  1.3013  4.2859  1.2252  1.9783  2.1571  2.2664 |
+|                  4.0503  2.4763  2.0683  3.9768  1.8749]                 |
++--------------------------------------------------------------------------+
+| [ 2.5424  1.3307  3.2325  0.9688  2.0776  1.9959  1.7835  1.2775  1.4582 |
+|                  1.2273  1.2911  1.4766  1.4837  1.9935]                 |
++--------------------------------------------------------------------------+
+| [ 2.0481  3.7921  2.442   1.8802  1.4928  1.5822  2.3639  0.9842  2.7897 |
+|                  1.1065  2.5807  1.9038  1.7031  5.0191]                 |
++--------------------------------------------------------------------------+
+| [ 3.1109  0.775   2.277   2.1461  0.5622  1.6686  3.8784  3.2826  3.7403 |
+|                  1.3582  2.5223  1.1782  0.8436  2.6141]                 |
++--------------------------------------------------------------------------+
+| [ 2.2279  5.4821  2.1238  3.6962  6.4277  2.2417  1.7606  1.6879  1.9597 |
+|                  2.0434  1.168   1.5005  1.8948  3.9383]                 |
++--------------------------------------------------------------------------+
+| [ 2.4285  3.0331  5.3743  4.7452  2.5515  6.6798  3.3174  3.4378  7.3007 |
+|                  3.5024  3.1128  5.843   3.2316  1.4862]                 |
++--------------------------------------------------------------------------+
+
+Color-ALL Error =  1.46234608695  Final Combined Error =  2.06078712746
+
+Existing Output Illum =  0.31272000 , 0.32903000  Temp =  6506.56787157  Starting Error =  0.0419744503152
+White point error, DWG values =  [ 0.3362  0.3362  0.3362]
+Optimized Output Illum =  0.31999132 , 0.33875087  Temp =  6021.82683945  Final Error =  2.74762259855e-06
+
+Dynamic Range =  14.573620135749845  stops.  4.494691158319076  above MG,  -10.078928977430769  below MG
+
+Writing 1d LUT  final_lut
+
+Writing Shaper LUT 
+Max Output Nits at input WP =  405.797498  Max output at 1.0 input =  407.224034743
+out min =  0.0
+out min =  0.0
+C:\Users\Zeb\Documents\Python\LogLin3\.venv\Lib\site-packages\colour\models\rgb\transfer_functions\davinci_intermediate.py:104: RuntimeWarning: invalid value encountered in log2
+  DI_C * (np.log2(L + DI_A) + DI_B),
+Luts complete
+
+Mean Combined Error =  2.4423354102  Median error =  2.08337752204
+Max error =  7.30068365061  Min Error =  0.532096509687
+
+Mean Color Error =  1.54000133364  Median error =  1.31298877008
+Max error =  5.00005770841  Min Error =  0.0853169689883
+Displaying Test Charts
+Found file  data\test_-5.png data\test_-3.png data\test_-1.png data\test_0.png data\test_1.png data\test_2.png 
+
+
+Process finished with exit code 0
