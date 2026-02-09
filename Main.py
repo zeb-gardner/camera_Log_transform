@@ -343,10 +343,8 @@ def main(args):
         plt.xlabel(None)
         plt.ylabel(None)
         plt.axis('off')
-        plt.title("Ground Truth")
+        plt.title("Reference Chart")
         plt.show()
-
-    good_chip_count = np.sum(bad_chips)
 
     seedLUT_values = []
     read_seed_lut(seed_lut_name, seedLUT_values)
@@ -355,9 +353,6 @@ def main(args):
     s_gamma = 1
 
     x = interp_1d_x_vals(bez_count_lum, 0, input_blackpoint, input_whitepoint, input_MG)
-    #print("Bez x's")
-    #print(x)
-    #print("\n")
     MG_bez = (np.abs(x - input_MG)).argmin()
 
     bez_values_lum = np.zeros(shape=(bez_count_lum, 2), dtype=float)
@@ -430,7 +425,6 @@ def main(args):
             #Increase smoothing every round
             SLOPE_LIMIT = SLOPE_LIMIT * 5
             SMOOTHING =  SMOOTHING *5
-            #print( "SLOPE_LIMIT = ", SLOPE_LIMIT, " SMOOTHING = ", SMOOTHING )
 
         # Binary Search 3x3
         best_three_by_three = three_by_three_binary(PERTURB_MAX_3X3 / (1.5**num_round_outer), test_chart_RGB, chart_name_low,
@@ -453,7 +447,7 @@ def main(args):
 
         print("Luma 1 Error = ", lum1_error , "Luma 2 Error = ",lum2_error )
 
-        if FIT_MODE == "CALC":  #Skip if using calulated log formula
+        if FIT_MODE == "CALC":  #Skip if using calculated log formula
             for num_round_inner in range(1,MAX_ITER_LUM):
                 peturb_amount = PETURB_MAX_LUM / (1.5**num_round_outer) / (2**num_round_inner)
                 error_old = sys.float_info.max
@@ -474,9 +468,6 @@ def main(args):
                         error_old = error_new
                     else:
                         break
-
-                #print("num_round_inner = ", num_round_inner, " Break at N = ", flag, " Perturb Amount = ", peturb_amount, " Error = ", error_new )
-
 
             print("Binary Search Best Luma Bez  = " ,best_bez_lum[:,1])
 
@@ -764,11 +755,9 @@ def gen_seed_bez_values(bez_values, seedLUT_values,bez_count_lum, MG_bez, input_
 
 
         bez_values[i] = x[i], seedLUT_values[j]
-        #print("i =", i, " j = ", j, " x = ", x, " val = " , seedLUT_values[j])
 
     first = 0 - bez_values[2,1]
     last = (2 * bez_values[bez_count_lum - 2,1]) - bez_values[bez_count_lum - 3,1]
-
 
     bez_values[0] = (0- spacing ),first
 
@@ -776,27 +765,18 @@ def gen_seed_bez_values(bez_values, seedLUT_values,bez_count_lum, MG_bez, input_
         max_x = input_whitepoint + spacing
     else:max_x = 1 + spacing
     bez_values[bez_count_lum-1] = max_x, last
-
     bez_values = set_bez_MG(bez_count_lum, bez_values, MG_bez)
-
 
 #End gen_seed_bez_values
 
 
 def read_chart(file_path,chip_RGB, chip_pixel,disp_chip_pixel_loc, chip_min, chip_max,chart_num):
-    #image = mpimg.imread(file_path)
-
-
     pngdata = png.Reader(file_path).read_flat()
     image = np.array(pngdata[2]).reshape((pngdata[1], pngdata[0], -1))
     image = (image/(2**16-1)).astype(float)
 
-
-
     chip_loc_x = []
     chip_loc_y = []
-
-
 
     for i in range(NUM_CHIP_X):
         chip_loc_x.append(int((CHIP_X0 + (i * CHIP_XDELTA)) * image.shape[0]))
@@ -835,8 +815,6 @@ def read_chart(file_path,chip_RGB, chip_pixel,disp_chip_pixel_loc, chip_min, chi
             )
             chip_RGB[i, j] = t[mask].mean(axis=0)
 
-
-
 # End Read Chart
 
 
@@ -850,12 +828,8 @@ def calc_bad_chips(chart_name_low,chart_name_high, chips_min,chips_max,white_poi
                 if (chips_max[i,j,k] <white_point) and (chips_min[i,j,k]>black_point):  #Check if chip is clipped or crushed
                     bad_chips [i, j, k] = 1
 
-
     good_chip_count = np.sum(bad_chips)
-
     print ("Total number of non-clipped chips = ", good_chip_count)
-
-
 #end Bad_chips
 
 
@@ -869,16 +843,12 @@ def write_lut_cube(filename, bez_curve_lum, three_by_three ,rec709_lut,input_whi
     bez_hue_sat = best_bez_hue_sat[range(bez_count_hue_sat), 1]
     bez_hue_sat = bez_hue_sat + MANUAL_HUE_SAT
 
-
     bez_curve_hue_hue = interp_1d_setup(bez_count_hue_hue,bez_hue_hue, hue=1,
                                         input_blackpoint=input_blackpoint,
                                         input_whitepoint=input_whitepoint, mode=HSL_MODE)
     bez_curve_hue_sat = interp_1d_setup(bez_count_hue_sat, bez_hue_sat, hue=1,
                                         input_blackpoint=input_blackpoint,
                                         input_whitepoint=input_whitepoint, mode=HSL_MODE)
-
-
-
     lut_size = 65
 
     max_in = input_whitepoint
@@ -931,9 +901,6 @@ def write_lut_cube(filename, bez_curve_lum, three_by_three ,rec709_lut,input_whi
                 for i in range(lut_size):
                     out[i,j,k] = interp_1d((i/(lut_size-1))*max_in, bez_curve_lum),interp_1d((j/(lut_size-1))*max_in, bez_curve_lum),interp_1d((k/(lut_size-1))*max_in, bez_curve_lum)
 
-        #out = np.clip(out, a_min=0, a_max=None)
-
-
         out = np.matmul(out, three_by_three)  #Multiply by 3x3
 
         if (gammut_comp):
@@ -943,7 +910,6 @@ def write_lut_cube(filename, bez_curve_lum, three_by_three ,rec709_lut,input_whi
 
         if not(s_gain ==1 and s_gamma ==1 ):  #No Need for HSL adjustments
             out_HSL = ACES2065_2_HSL(out)
-            print("Running HSL Adjustments")
 
             np.where(out_HSL[:, :, :, 0] < 0, out_HSL[:, :, :, 0],out_HSL[:, :, :, 0] + 1)  # Normalize Hue values that wrapped around
             np.where(out_HSL[:, :, :, 0] > 1, out_HSL[:, :, :, 0], out_HSL[:, :, :, 0] - 1)
@@ -1001,7 +967,6 @@ def write_lut_1D(filename, bez_curve_lum, input_whitepoint ):
 
         out = np.clip(out, a_min=0, a_max=None)
 
-
         for i in range(lut_size):
             f.writelines(str(out[i]) + " " + str(out[i]) + " " + str(out[i]) + "\n")
         f.close()
@@ -1043,13 +1008,9 @@ def write_lut_shaper(filename, bez_curve_lum, three_by_three,norm_lut_max,input_
         out = interp_1d(out, bez_curve_lum)
         out = np.clip(out, a_min=0, a_max=None)
 
-        """if (expand_tone):
-            out = tone_map_lin(out, inflection_percent)"""
-
         out = colour.models.oetf_DaVinciIntermediate(out)
 
         max_in_3d = np.max(out)
-
 
         f.writelines("TITLE " + filename + "\n")
         f.writelines("LUT_1D_SIZE "+str(lut_size_1d) + "\n")
@@ -1070,8 +1031,6 @@ def write_lut_shaper(filename, bez_curve_lum, three_by_three,norm_lut_max,input_
 
 
         out = colour.models.oetf_inverse_DaVinciIntermediate(out)
-
-
         out = np.matmul(out, three_by_three)  #Multiply by 3x3
 
         if (gammut_comp):
@@ -1115,11 +1074,9 @@ def write_lut_shaper(filename, bez_curve_lum, three_by_three,norm_lut_max,input_
 
 def write_lut_clf(filename, bez_curve_lum, three_by_three ,rec709_lut,bez_curve_hue_hue,bez_curve_hue_sat,norm_lut_max,input_whitepoint, s_gain, s_gamma):
 
-
     max_in = input_whitepoint
     if max_in< 1 :
         max_in = 1
-
 
     with open(str("CLF"+filename+".clf"), 'w', 100 * (2 ** 20)) as f:
 
@@ -1190,9 +1147,6 @@ def write_lut_clf(filename, bez_curve_lum, three_by_three ,rec709_lut,bez_curve_
 
         out = np.clip(out_lin_XYZ, a_min=0, a_max=None)
 
-
-
-
         f.writelines("<Range inBitDepth=\"32f\" outBitDepth=\"32f\">\n")
         f.writelines("<Description>3d Range</Description>\n")
         f.writelines("<minInValue>0</minInValue>\n")
@@ -1220,9 +1174,6 @@ def write_lut_clf(filename, bez_curve_lum, three_by_three ,rec709_lut,bez_curve_
 
 
 def set_bez_MG(bez_count_lum, bez_values_lum, MG_bez):
-
-
-
 
     bez_values_lum[MG_bez, 1] = MIDDLE_GRAY_LIN
     bez_values_lum[1, 1] = 0
@@ -1288,9 +1239,7 @@ def ACES2065_2_HSL(input):
 
 
 def HSL_2_ACES2065(input):
-
     #return colour.HSL_to_RGB(input)
-
     return XYZ_2_ACES2065(HSL_2_XYZ(input))
 
 def HSL_2_XYZ(input):
@@ -1318,13 +1267,11 @@ def XYZ_2_HSL(input):
 def HSL_2_LAB(input):
 
     #return ACES2065_2_LAB(colour.HSL_to_RGB(input))
-
     return XYZ_2_LAB(HSL_2_XYZ(input))
 
 def HSL_2_sRGB(input):
 
    #return ACES2065_2_REC709 (colour.HSL_to_RGB(input))
-
     return XYZ_2_sRGB(HSL_2_XYZ(input))
 
 def ACES2065_2_REC709 (input):
@@ -1392,7 +1339,6 @@ def interp_1d_x_vals(x_max,hue,input_blackpoint,input_whitepoint, input_MG):
 
         for i in range (1,x_max+1):
             new_x[i]=x[i-1]
-
         x = new_x.copy()
 
         return x
@@ -1468,16 +1414,12 @@ def perturb_curve (bez_values_lum, bez_values_hue_hue, bez_values_hue_sat  ,test
                    bez_count_lum, bez_count_hue_hue, bez_count_hue_sat,chart_name_low, chart_name_high,chart_weight,perturb_step,mode,
                    input_blackpoint,input_whitepoint, s_gain =1, s_gamma=1, MG_bez=0, input_MG= 0 ):
 
-
-
     init_error = -1
     init_bez_values = []
     test_bez_count = 0
     test_type = "Luma2"
     max_iter=0
     error_zero = sys.float_info.max
-
-    good_chip_count = np.sum(bad_chips)
 
     if (mode == "Lum"):
         init_bez_values = bez_values_lum.copy()
@@ -1532,8 +1474,6 @@ def perturb_curve (bez_values_lum, bez_values_hue_hue, bez_values_hue_sat  ,test
             test_bez_values_up[:,1] = test_bez_values_up[:,1] - np.sum(test_bez_values_up[1:test_bez_count,1])/(test_bez_count-1)
             test_bez_values_down[:, 1] = test_bez_values_down[:, 1] - np.sum(test_bez_values_down[1:test_bez_count, 1]) /(test_bez_count-1)
 
-            #print("test_bez_values_up ", test_bez_values_up)
-            #print("test_bez_values_down ", test_bez_values_down)
 
         init_error_up = -1
         init_error_down = -1
@@ -1554,7 +1494,6 @@ def perturb_curve (bez_values_lum, bez_values_hue_hue, bez_values_hue_sat  ,test
                                           chart_name_high, three_by_three, bad_chips, test_type, chart_weight, final=0,
                                         input_blackpoint=input_blackpoint,input_whitepoint=input_whitepoint,input_MG = input_MG)))
 
-            #print("Bez = ", bez, "ERROR_ZERO = ",error_zero )
 
         elif (mode == "Hue-Hue"):
             init_error_up = error_sum(bez_count_lum, bez_values_lum, test_chart_RGB, chart_name_low,
@@ -1601,29 +1540,12 @@ def perturb_curve (bez_values_lum, bez_values_hue_hue, bez_values_hue_sat  ,test
 
 
         if ((init_error_up<init_error_down) and (init_error_up < error_zero)):
-            #print ("Bez =", bez, " Up")
-            #up_down[bez] = 1
             best_bez_values = test_bez_values_up.copy()
-            #print( "UP Bez = ", bez, " Error = ", init_error_up, " ", best_bez_values[:,1])
-
         elif ((init_error_down<init_error_up) and (init_error_down <error_zero)):
-            #print ("Bez =", bez, " down")
-            #up_down[bez] = -1
             best_bez_values = test_bez_values_down.copy()
-            #print("Down Bez = ", bez," Error = ",init_error_down , " ", best_bez_values[:,1])
-
         else:
-            #up_down[bez] = 0
-            #print("Zero Bez = ", bez, " Error = ", error_zero , " ",best_bez_values[:,1])
             pass
-
-
-
-
-    #print("BEST = " ,best_bez_values[:, 1])
     return best_bez_values
-
-
 
 
 def calc_error_RGB(test, ref, chip_weight, bad_chips, luma_test,chart_name_low,chart_name_high,chart_weight, final = 0):
@@ -1656,43 +1578,30 @@ def calc_error_RGB(test, ref, chip_weight, bad_chips, luma_test,chart_name_low,c
         mean_weight =  mean_weight +weight
         if (luma_test == "Luma"):  # Error is relative to LAB reference chart values
             del_L = bad_chips[i] * chip_weight * (test[i, :, :, 0] - ref[:, :, 0])
-
-            #t = (del_L ** 2) * weight
             t = np.abs(del_L)  * weight
-
             error_list[i] = del_L
             error_list_weighted[i] = t
 
         elif (luma_test == "Luma2"):  # Compare against Test chart 0, not reference.
             if (i != 0):
                 del_L = bad_chips[i] * chip_weight * (test[i, :, :, 0] - test[0, :, :, 0])
-
-                #t = (del_L ** 2) * weight
                 t = np.abs(del_L)  * weight
-
                 error_list[i] = del_L
                 error_list_weighted[i] = t
 
         elif (luma_test == "Color" or luma_test == "Color_all"):  # Color Test exclude luma error
-
             mean_lum = (test[i, :, :, 0] + ref[:, :, 0]) / 2  #set both chips to mean luma
             test_1[i, :, :, 0] = mean_lum
             ref_1[:, :, 0] = mean_lum
-
             deltae = colour.difference.delta_E_CIE2000(test_1[i], ref_1) #** 2
-
             t = deltae * bad_chips[i] * chip_weight * weight
-
             error_list[i] = deltae
             error_list_weighted[i] = t
 
 
         elif (luma_test == "Combined"):  #Combined Luma and Color error
-
             deltae = (colour.difference.delta_E_CIE2000(test[i], ref)) #** 2
-
             t = deltae * bad_chips[i] * chip_weight * weight
-
             error_list[i] = deltae
             error_list_weighted[i] = t
 
@@ -1755,12 +1664,9 @@ def calc_charts(chip_RGB, chart_name_low,chart_name_high, bez_curve_lum=None, th
         flat_lin_mean[1] = np.exp(g.mean())
         flat_lin_mean[2] = np.exp(b.mean())
 
-
         flat_lin_delta = flat_lin / flat_lin_mean  #How far each flat chip is from mean
         flat_lin_delta = np.reshape(flat_lin_delta, shape=(num_chip_x, num_chip_y, 3))
 
-        #print("flat_lin_mean = ", flat_lin_mean)
-        #print("flat_lin_delta = ",flat_lin_delta)
 
     for i in range(chart_name_low, chart_name_high + 1):  # Normalize exposure
         if FLAT_RGB is not None:  # Apply Flat Compensation
@@ -1770,7 +1676,6 @@ def calc_charts(chip_RGB, chart_name_low,chart_name_high, bez_curve_lum=None, th
 
         chip_RGB_LIN_norm[i, :, :] = chip_RGB_LIN[i, :, :] * (2 ** (-1 * i))
 
-    #chip_sRGB_lin_norm = np.matmul(chip_RGB_LIN_norm, three_by_three)  # Then multiply by three by three
     chip_ACES_2065_lin_norm = np.matmul(chip_RGB_LIN_norm, three_by_three)  # Then multiply by three by three
 
     if not INPUT_ILLUMINANT == [-1,-1]:  #Apply input illuminat compensation
@@ -1781,33 +1686,20 @@ def calc_charts(chip_RGB, chart_name_low,chart_name_high, bez_curve_lum=None, th
                  chromatic_adaptation_transform=CAT, apply_cctf_decoding=False, apply_cctf_encoding=False)
 
     if (bez_curve_hue_hue is None)  and (bez_curve_hue_sat is None):  # Use 3x3 not hue_hue,Hue_sat
-
-        #chip_LAB_norm = linSRGB_2_LAB(chip_sRGB_lin_norm)
         chip_LAB_norm = ACES2065_2_LAB(chip_ACES_2065_lin_norm)
-        #print("chip_LAB_norm = ", chip_LAB_norm)
-
 
     elif (bez_curve_hue_hue is not None) and (bez_curve_hue_sat is not None):  # Use hue_hue,Hue_sat
 
         if (s_gamma ==1 and s_gain ==1 ):  #No need to run HSL conversion as we are still at defaults
-            #chip_LAB_norm = linSRGB_2_LAB(chip_sRGB_lin_norm)
             chip_LAB_norm = ACES2065_2_LAB(chip_ACES_2065_lin_norm)
         else:
-
-            #chip_HSL_norm = XYZ_2_HSL(chip_XYZ_lin_norm)
-            #chip_HSL_norm = linsRGB_2_HSL(chip_sRGB_lin_norm)
             chip_HSL_norm = ACES2065_2_HSL(chip_ACES_2065_lin_norm)
-
-            #chip_HSL_norm = np.clip(chip_HSL_norm, a_min=0, a_max=None)
             chip_HSL_norm[:, :, :, 1] = chip_HSL_norm[:, :, :, 1] **(1/ s_gamma) #Apply Saturation Gamma
             chip_HSL_norm[:, :, :, 1] = chip_HSL_norm[:, :, :, 1] * s_gain   #Apply Saturation gain
 
             chip_HSL_norm[:, :, :, 0] = chip_HSL_norm[:, :, :, 0] + interp_1d(chip_HSL_norm[:, :, :, 0], bez_curve_hue_hue)   #Apply Hue_hue Curve
-            #print("Before ", chip_HSL_norm[:, :, :, 0])
             np.where(chip_HSL_norm[:, :, :, 0]<0, chip_HSL_norm[:, :, :, 0], chip_HSL_norm[:, :, :, 0]+1)  #Normalize Hue values that wrapped around
             np.where(chip_HSL_norm[:, :, :, 0] >1, chip_HSL_norm[:, :, :, 0], chip_HSL_norm[:, :, :, 0] - 1)
-            #print("After ", chip_HSL_norm[:, :, :, 0])
-            #chip_HSL_norm = np.clip(chip_HSL_norm, a_min=0, a_max=None)
             chip_HSL_norm[:, :, :, 1] = chip_HSL_norm[:, :, :, 1] * interp_1d(chip_HSL_norm[:, :, :, 0], bez_curve_hue_sat)  # Apply Hue_sat Curve
             chip_LAB_norm = HSL_2_LAB(chip_HSL_norm)  # Convert back to LAB
 
@@ -1823,21 +1715,9 @@ def main_color_thread(chip_RGB, bez_curve_lum, start_three_by_three, num_charts,
                                     chart_name_high, chart_weight,three_by_three_opt_iter,WB_Control ):
 
     time_start = time.time()
-
-
-
-    good_chip_count = np.sum(bad_chips)
-
     new_chip_LAB_norm = calc_charts(chip_RGB, chart_name_low, chart_name_high, bez_curve_lum=bez_curve_lum, three_by_three=start_three_by_three)
-
     init_color_error = calc_error_RGB(new_chip_LAB_norm, REFCHIP_LAB, ALL_CHIPS, bad_chips, "Color_all", chart_name_low,
                                     chart_name_high, chart_weight, final=0)
-
-
-
-    #print("\n Genetic Color Round " + str(num_round)+ " Initial Color Error ", init_color_error)
-
-    #print ("Initial 3x3 = \n",start_three_by_three)
 
     child_three_by_three_queue =mp.Queue()
     min_color_error = init_color_error
@@ -1848,8 +1728,6 @@ def main_color_thread(chip_RGB, bez_curve_lum, start_three_by_three, num_charts,
     for i in range(NUM_THREADS):  # setup original children
         parent_three_by_three[i] = start_three_by_three.copy()
 
-    last_time = time.time()
-
     for gen in range(0, three_by_three_opt_iter):
         processes = []
 
@@ -1859,12 +1737,8 @@ def main_color_thread(chip_RGB, bez_curve_lum, start_three_by_three, num_charts,
         color_error = calc_error_RGB(chip_LAB_norm, REFCHIP_LAB, ALL_CHIPS, bad_chips, "Color_all",
                                           chart_name_low,chart_name_high, chart_weight, final=0)
 
-
-
         print ("\n 3x3 Color Generation # " + str(gen+1) + " of " + str(three_by_three_opt_iter) +"   Color-All Error " + str(color_error))
-        t = (time.time()) - last_time
-        last_time = time.time()
-        #print ("Time Remaining " + str (t*(MAX_GEN_C-gen)/60) +" mins")
+
 
         for i in range(NUM_THREADS):
             p = mp.Process(target=peturb_color_three_by_three_thread, args=(i, (num_round-1)*(gen+1), num_charts, chip_RGB, REFCHIP_LAB, bad_chips, parent_three_by_three[i],
@@ -1906,14 +1780,6 @@ def main_color_thread(chip_RGB, bez_curve_lum, start_three_by_three, num_charts,
     print(final_color_error)
     print("Duration (s)= ", time.time()-time_start)
 
-    #print("\n Best Three by Three")
-    #print(best_three_by_three)
-
-
-
-    #print("Difference")
-    #print(str(best_three_by_three -start_three_by_three ))
-
     return best_three_by_three
 
 #End Main Color
@@ -1921,9 +1787,6 @@ def main_color_thread(chip_RGB, bez_curve_lum, start_three_by_three, num_charts,
 
 def main_color(chip_RGB, bez_curve_lum, start_three_by_three, bad_chips, chart_name_low,
                                     chart_name_high, chart_weight,three_by_three_opt_iter):
-
-    time_start = time.time()
-    good_chip_count = np.sum(bad_chips)
 
     child_color_error_list = np.zeros(shape=(NUM_PARENT_C), dtype=float)
     child_best_three_by_three = np.zeros(shape=(NUM_PARENT_C, 3,3), dtype=float)
@@ -1954,18 +1817,9 @@ def main_color(chip_RGB, bez_curve_lum, start_three_by_three, bad_chips, chart_n
                 parent_three_by_three[i] = t / 2
 
         best_three_by_three = child_best_three_by_three[child_color_error_list.argmin()]
-        #print ("Best Child = ", child_color_error_list.argmin(), " Min error = ",np.min(child_color_error_list)  ," Max Error = ", np.max(child_color_error_list))
-
 
         chip_LAB_norm = calc_charts(chip_RGB, chart_name_low, chart_name_high, bez_curve_lum=bez_curve_lum,
                                         three_by_three=best_three_by_three)
-
-        color_error = calc_error_RGB(chip_LAB_norm, REFCHIP_LAB, ALL_CHIPS, bad_chips, "Color_all",
-                                          chart_name_low,chart_name_high, chart_weight, final=0)
-
-        #print("\n 3x3 Color Generation # " + str(gen + 1) + " of " + str(three_by_three_opt_iter) + "   Color-All Error " + str(color_error ))
-        #print("\n",best_three_by_three)
-
 
     new_chip_LAB_norm = calc_charts(chip_RGB, chart_name_low, chart_name_high, bez_curve_lum=bez_curve_lum,three_by_three=best_three_by_three)
 
@@ -2021,16 +1875,6 @@ def three_by_three_binary(perturb_max, test_chart_RGB, chart_name_low,chart_name
                     three_by_three_down[:, j] = three_by_three_down[:, j] - t
                     #if np.sum(three_by_three_down) != 0: three_by_three_down = three_by_three_down / (np.sum(three_by_three_down) / 3)  # force sum to 1
 
-
-
-
-                    """error_zero= error_sum(bez_count_lum, best_bez_lum, test_chart_RGB, chart_name_low, chart_name_high,
-                                three_by_three_zero, bad_chips, 'Color_all',
-                                chart_weight, final=0, bez_count_hue_hue=bez_count_hue_hue, bez_count_hue_sat=bez_count_hue_sat,
-                                bez_values_hue_hue=best_bez_hue_hue, bez_values_hue_sat=best_bez_hue_sat,
-                                input_blackpoint=input_blackpoint,
-                                input_whitepoint=input_whitepoint, s_gain=s_gain, s_gamma=s_gamma, input_MG=input_MG)"""
-
                     error_up = error_sum(bez_count_lum, best_bez_lum, test_chart_RGB, chart_name_low, chart_name_high,
                                            three_by_three_up, bad_chips, 'Color_all',
                                            chart_weight, final=0, bez_count_hue_hue=bez_count_hue_hue,
@@ -2047,7 +1891,6 @@ def three_by_three_binary(perturb_max, test_chart_RGB, chart_name_low,chart_name
                                            input_blackpoint=input_blackpoint,
                                            input_whitepoint=input_whitepoint, s_gain=s_gain, s_gamma=s_gamma, input_MG=input_MG)
 
-                     #print("Up =",error_up," Down =",error_down," Zero =",error_zero)
 
                     if (error_up > error_zero) and (error_down > error_zero):
                         pass
@@ -2092,8 +1935,6 @@ def peturb_color_three_by_three_thread(thread_num, generation, num_charts, chip_
                            chart_name_low, chart_name_high, chart_weight, final=0)
 
 
-
-    #print(parent_three_by_three)
     seed = 593 + (thread_num * 1847) + (generation *  	2111)
     rng = np.random.default_rng(seed=seed)
 
@@ -2161,8 +2002,6 @@ def peturb_color_three_by_three(parent_num, generation, chip_RGB, refchip_lab, b
     peturb_max = PETURB_MAX_C / (2**generation)
     peturb_max = peturb_max * ((parent_num+1) / NUM_PARENT_C)
 
-    #print ("peturb_max = " , peturb_max)
-
     num_children = NUM_CHILDREN_C
     color_chips = ALL_CHIPS
 
@@ -2180,7 +2019,6 @@ def peturb_color_three_by_three(parent_num, generation, chip_RGB, refchip_lab, b
 
         rand = rng.normal(loc=0.0, scale=peturb_max, size=9)
         rand = np.reshape(rand, shape=(3,3))
-        #rand = rand * [[1,0.5,0.5],[0.5,1,0.5],[0.5,0.5,1]]   #off axis values get smaller effect
         new_three_by_three = best_three_by_three + rand
         sum = np.sum(new_three_by_three)
         if (sum != 0): new_three_by_three = new_three_by_three / (sum/3)  #Force Sum to 1
@@ -2216,7 +2054,6 @@ def disp_chart(bez_curve,three_by_three,bez_curve_hue_hue,bez_curve_hue_sat,s_ga
             image_lin[:, :, 2] = interp_1d(image[:, :, 2], bez_curve)
 
             image_lin_norm = image_lin * (2 ** (-1 * exp_shift))
-            #image_lin_sRGB_norm = np.matmul(image_lin_norm, three_by_three)  # Then multiply by three by three
             image_ACES2065_lin_norm = np.matmul(image_lin_norm, three_by_three)  # Then multiply by three by three
 
             if not INPUT_ILLUMINANT == [-1, -1]:  # Apply input illuminat compensation
@@ -2243,14 +2080,10 @@ def disp_chart(bez_curve,three_by_three,bez_curve_hue_hue,bez_curve_hue_sat,s_ga
 
             image_SRGB_Norm = HSL_2_sRGB(image_HSL_Norm)  # Convert back to sRGB
 
-
-
             image_SRGB_Norm = np.clip(image_SRGB_Norm, a_min=0, a_max=1)
             export_filename = (str(filename).removesuffix('.png') + "_corrected.png")
             export_img = (image_SRGB_Norm * 255).astype(np.uint8)
             iio.imwrite(export_filename, export_img)
-
-            #print ("Sat Max = ", np.max(image_HSL_Norm[ :, :, 1]))
 
             plt.imshow(image)
             plt.xlabel(None)
@@ -2275,7 +2108,6 @@ def disp_chart_single(bez_curve,three_by_three,test_chart_RGB,bez_curve_hue_hue,
         image_lin[:, :, 1] = interp_1d(test_chart_RGB[0,:, :, 1], bez_curve)
         image_lin[:, :, 2] = interp_1d(test_chart_RGB[0,:, :, 2], bez_curve)
 
-
         image_ACES2065_lin = np.matmul(image_lin, three_by_three) # Then multiply by three by three
 
         if not INPUT_ILLUMINANT == [-1, -1]:  # Apply input illuminat compensation
@@ -2291,7 +2123,6 @@ def disp_chart_single(bez_curve,three_by_three,test_chart_RGB,bez_curve_hue_hue,
 
         image_HSL_Norm = ACES2065_2_HSL(image_ACES2065_lin)
 
-
         image_HSL_Norm = np.clip(image_HSL_Norm, a_min=0, a_max=None)
         image_HSL_Norm[:, :, 1] = image_HSL_Norm[:, :, 1] ** (1 / s_gamma)  # Apply Saturation Gamma
         image_HSL_Norm[:, :, 1] = image_HSL_Norm[:, :, 1] * s_gain  # Apply Saturation Gain
@@ -2304,11 +2135,8 @@ def disp_chart_single(bez_curve,three_by_three,test_chart_RGB,bez_curve_hue_hue,
 
         image_SRGB_Norm = HSL_2_sRGB(image_HSL_Norm)  # Convert back to sRGB
 
-
         image_SRGB_Norm = np.clip(image_SRGB_Norm, a_min=0, a_max=1)
         export_img = (image_SRGB_Norm * 255).astype(np.uint8)
-        #export_img = ski.transform.rescale(export_img, scale=10)
-        #export_img = (export_img * 255).astype(np.uint8)
         iio.imwrite("data/results/ref_chart_corrected.png", export_img)
 
         plt.imshow(test_chart_RGB[0,:,:,:])
@@ -2334,14 +2162,12 @@ def plothisto(num_chips,test_chart_LAB_norm):
 
     for i in range(num_chips):
         deltae_combined[i] = colour.difference.delta_E_CIE2000(ref_chip_LAB_list[i], test_chart_LAB_norm_list[i])
-        #print (test_chart_LAB_norm_list[i] , ref_chip_LAB_list[i], deltae[i])
     print("\nMean Combined Error = ", np.mean(deltae_combined), " Median error = ", np.median(deltae_combined))
     print("Max error = ", np.max(deltae_combined), " Min Error = ", np.min(deltae_combined))
 
     test_chart_LAB_norm_list[:, 0] = ref_chip_LAB_list[:,0] #Set luma to same, to only test color error
     for i in range(num_chips):
         deltae_color[i] = colour.difference.delta_E_CIE2000(ref_chip_LAB_list[i], test_chart_LAB_norm_list[i])
-        #print (test_chart_LAB_norm_list[i] , ref_chip_LAB_list[i], deltae[i])
     print("\nMean Color Error = ", np.mean(deltae_color), " Median error = ", np.median(deltae_color))
     print("Max error = ", np.max(deltae_color), " Min Error = ", np.min(deltae_color))
 
@@ -2459,14 +2285,8 @@ def error_sum(bez_count_lum, best_bez_lum, test_chart_RGB, chart_name_low, chart
         num_slope_high = np.where(slope > SLOPE_MAX, 1, 0)
         slope_error = 1 +(np.sum(num_slope_low) +  np.sum(num_slope_high))*SLOPE_LIMIT
 
-        #if slope_error> 1 :print("Min Slope = ",np.min(slope), " Count = ",np.sum(num_slope_low) , " Max Slope = ", np.max(slope), " Count = ",np.sum(num_slope_high) )
-
-
         if SMOOTHING>0:    #do second derivative error
             second_d = np.subtract(slope[1:99], slope [0:98])
-            # print ("Max 2nd-D = ", np.max(second_d), "Mean 2nd-D = ", np.mean(second_d))
-
-            #second_d = np.abs(second_d)
             second_d = np.power(second_d, 2)
             second_d_error = 1 + (np.sum(second_d) * SMOOTHING * 100)
 
@@ -2503,8 +2323,6 @@ def error_sum(bez_count_lum, best_bez_lum, test_chart_RGB, chart_name_low, chart
 def main_luma(init_bez_values,num_charts,chip_RGB,input_blackpoint, input_whitepoint, bad_chips, num_round,three_by_three,bez_count_lum,
               chart_name_low, chart_name_high,chart_weight,max_gen_lum, input_MG, MG_Bez):
 
-    good_chip_count = np.sum(bad_chips)
-
     bez_curve_lum = interp_1d_setup(bez_count_lum, init_bez_values[range(bez_count_lum),1],hue=0,input_blackpoint=input_blackpoint,
                                     input_whitepoint=input_whitepoint, input_MG = input_MG)
 
@@ -2512,8 +2330,6 @@ def main_luma(init_bez_values,num_charts,chip_RGB,input_blackpoint, input_whitep
                                       three_by_three=three_by_three)
     lum_error = calc_error_RGB(test_chart_LAB_norm, REFCHIP_LAB, LUMA_CHIPS, bad_chips, "Luma2", chart_name_low,
                                     chart_name_high, chart_weight, final=0)
-
-    #print("\nRound " + str(num_round) + " Starting Luma error= " + str(lum_error))
 
     best_bez_queue  = mp.Queue()
     min_error = lum_error
@@ -2573,11 +2389,6 @@ def main_luma(init_bez_values,num_charts,chip_RGB,input_blackpoint, input_whitep
     lowest_error_POS = np.argmin(child_error_list)
     best_bez_values = child_bez_list[lowest_error_POS, :, :]
 
-    #print ("\nRound " + str(num_round) +" Final Luma Error")
-    #print(min_error)
-    #print("Final Bez Values")
-    #print(best_bez_values[:,1])
-
     return best_bez_values
 
 #end Main Luma
@@ -2597,16 +2408,12 @@ def peturb_luma (thread_num, generation, best_bez_list, parent_bez_values, num_c
 
     num_children = NUM_CHILDREN
 
-    good_chip_count = np.sum(bad_chips)
-
     min_error = sys.float_info.max
 
     new_bez_values = parent_bez_values.copy()
     bez_value = parent_bez_values.copy()
 
     t = np.zeros(shape=(bez_count,2), dtype=float)
-
-    #print ("Thread #" +str(thread_num))
     seed = 1733 + (thread_num * 107) + (generation * 2237)
     rng = np.random.default_rng(seed = seed)
 
@@ -2623,15 +2430,11 @@ def peturb_luma (thread_num, generation, best_bez_list, parent_bez_values, num_c
         new_bez_values[bez_count - 1, 1] = np.clip(new_bez_values[bez_count - 1, 1], a_min=new_bez_values[bez_count - 2, 1], a_max=None)
         new_bez_values[1:,1]= np.clip(new_bez_values[1:,1], 0, a_max=None)
 
-
-
         new_bez_values = set_bez_MG(bez_count, new_bez_values, MG_bez)
-
 
         error = error_sum(bez_count, new_bez_values, chip_RGB, chart_name_low, chart_name_high, three_by_three,bad_chips,
                           luma_test, chart_weight, final=0, input_blackpoint=input_blackpoint,input_whitepoint=input_whitepoint,
                           input_MG=input_MG)
-
 
         if (error < min_error):
             min_error = error
@@ -2652,18 +2455,14 @@ def peturb_luma (thread_num, generation, best_bez_list, parent_bez_values, num_c
                     test_error = error_sum(bez_count, test_bez, chip_RGB, chart_name_low, chart_name_high,three_by_three, bad_chips,
                                       luma_test, chart_weight, final=0, input_blackpoint=input_blackpoint,input_whitepoint=input_whitepoint, input_MG=input_MG)
 
-
                     if (test_error <  error):  #We found a better solution
                         new_bez_values = test_bez.copy()
                         error = test_error
                     else: break
 
                 if (error < min_error):  #save these good new values
-                    #print("Better results found, new Error ", error, " vs ", min_error)
                     min_error = error
                     bez_value = new_bez_values.copy()
-
-    #print("\n Bez = ", bez_value[:,1])
 
     bez_value[0, 0] = min_error
     best_bez_list.put(bez_value)
@@ -2672,11 +2471,7 @@ def peturb_luma (thread_num, generation, best_bez_list, parent_bez_values, num_c
 def s_gain_opt(s_gain_init,perturb_max, bez_count_lum, bez_values_lum, test_chart_RGB,chart_name_low, chart_name_high, three_by_three, bad_chips,
                chart_weight,bez_count_hue_hue,bez_count_hue_sat,bez_values_hue_hue, bez_values_hue_sat,input_blackpoint,input_whitepoint,s_gamma ,input_MG):
 
-
     test_s_gain = s_gain_init
-    #good_chips = np.sum(bad_chips)
-
-
 
     for i in range (MAX_ITER_S_GAIN):
 
@@ -2701,11 +2496,6 @@ def s_gain_opt(s_gain_init,perturb_max, bez_count_lum, bez_values_lum, test_char
                                    bez_values_hue_hue=bez_values_hue_hue, bez_values_hue_sat=bez_values_hue_sat,input_blackpoint=input_blackpoint,
                                   input_whitepoint=input_whitepoint, s_gain = test_s_gain,s_gamma = s_gamma,input_MG = input_MG)
 
-
-
-
-        #print("test s = ", test_s_gain, " Error zero = ",error_zero, " Error up = ",error_up," Error down = ", error_down)
-
         if (error_up>error_zero) and (error_down>error_zero):
             pass
         elif error_up < error_down :
@@ -2719,11 +2509,8 @@ def s_gain_opt(s_gain_init,perturb_max, bez_count_lum, bez_values_lum, test_char
 def s_gamma_opt(s_gamma_init,perturb_max, bez_count_lum, bez_values_lum, test_chart_RGB,chart_name_low, chart_name_high, three_by_three, bad_chips,
                chart_weight,bez_count_hue_hue,bez_count_hue_sat,bez_values_hue_hue, bez_values_hue_sat,input_blackpoint,input_whitepoint,s_gain ,input_MG):
 
-
     test_s_gamma = s_gamma_init
-    #good_chips = np.sum(bad_chips)
     error_down = -1
-
 
     for i in range (MAX_ITER_S_GAMMA):
 
@@ -2751,10 +2538,6 @@ def s_gamma_opt(s_gamma_init,perturb_max, bez_count_lum, bez_values_lum, test_ch
                                   input_whitepoint=input_whitepoint, s_gain =s_gain, s_gamma = test_s_gamma, input_MG = input_MG)
 
 
-
-
-        #print("test s_gamma = ", test_s_gamma, " Error zero = ",error_zero, " Error up = ", error_up," Error down = ", error_down)
-
         if (error_up>error_zero) and (error_down>error_zero):
             pass
         elif error_up < error_down :
@@ -2781,12 +2564,7 @@ def sat_max(bez_count_lum, best_bez_lum, three_by_three,input_blackpoint,input_w
     rgb = np.matmul (rgb, three_by_three)
     rgb = np.clip(rgb, a_min=-0, a_max=None)
 
-    #print ("RGB = ", rgb)
-
     hsl = ACES2065_2_HSL(rgb)
-
-    #print ("HSL = ", hsl)
-
     max = np.max(hsl[:,:,:,1])
 
     location =np.unravel_index(np.argmax(hsl[:,:,:,1]), hsl[:,:,:,1].shape )
@@ -2802,9 +2580,6 @@ def sat_max(bez_count_lum, best_bez_lum, three_by_three,input_blackpoint,input_w
     location = np.unravel_index(np.argmax(test_chart_HSL[:, :, :, 1]), test_chart_HSL[:, :, :, 1].shape)
     print("Sat Max Actual = ", max, " at ",location)
 
-
-
-
 # Calculate compressed distance
 def compress( dist,  lim,  thr,  pwr):
 
@@ -2812,7 +2587,6 @@ def compress( dist,  lim,  thr,  pwr):
 
     if (dist < thr) :
         comprDist = dist #No compression below threshold
-
     else:
         # Calculate scale factor for y = 1 intersect
         scl = (lim - thr) /  np.power(np.power((1.0 - thr) / (lim - thr), -pwr) - 1.0, 1.0 / pwr)
@@ -2824,7 +2598,6 @@ def compress( dist,  lim,  thr,  pwr):
         comprDist = thr + scl * nd / (np.power(1.0 + p, 1.0 / pwr)) # Compress
 
     return comprDist
-
 
 def gammut_compression(input, strength, mode):  #Take sRGB/lin in, apply aces gammut compression, and return sRGB/lin
 
@@ -2850,7 +2623,7 @@ def gammut_compression(input, strength, mode):  #Take sRGB/lin in, apply aces ga
         #// Aggressiveness of the compression curve
         PWR = 1.2
 
-        input = colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_sRGB,RGB_COLOURSPACE_ACESCG,
+        input = colour.RGB_to_RGB(input, RGB_COLOURSPACE_ACES2065_1,RGB_COLOURSPACE_ACESCG,
                                         chromatic_adaptation_transform=None, apply_cctf_decoding=False, apply_cctf_encoding=False)
 
     elif (mode == 2):  # DWG
@@ -2868,7 +2641,7 @@ def gammut_compression(input, strength, mode):  #Take sRGB/lin in, apply aces ga
 
         PWR = 1.2
 
-        input = colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_sRGB, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT,
+        input = colour.RGB_to_RGB(input, RGB_COLOURSPACE_ACES2065_1, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT,
                                   chromatic_adaptation_transform=None, apply_cctf_decoding=False,
                                   apply_cctf_encoding=False)
 
@@ -2910,37 +2683,15 @@ def gammut_compression(input, strength, mode):  #Take sRGB/lin in, apply aces ga
                 output[i,j,k,2] = ach - comprDist[2] * abs(ach)
 
     if (mode == 1):  # ACES
-        output = colour.RGB_to_RGB(output, RGB_COLOURSPACE_ACESCG, RGB_COLOURSPACE_LIN_sRGB,
+        output = colour.RGB_to_RGB(output, RGB_COLOURSPACE_ACESCG, RGB_COLOURSPACE_ACES2065_1,
                                    chromatic_adaptation_transform=None, apply_cctf_decoding=False,
                                    apply_cctf_encoding=False)
     elif (mode == 2):  # DWG
-        output = colour.RGB_to_RGB(output, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT,RGB_COLOURSPACE_LIN_sRGB,
+        output = colour.RGB_to_RGB(output, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT,RGB_COLOURSPACE_ACES2065_1,
                               chromatic_adaptation_transform=None, apply_cctf_decoding=False, apply_cctf_encoding=False)
 
     return output
 
-def tone_map_lin(input,inflection_percent,init_max):
-
-
-
-    target_max = [1,1,1]  #In DWG/I
-    target_max = colour.RGB_to_RGB(target_max, RGB_COLOURSPACE_DAVINCI_WIDE_GAMUT, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,
-                      chromatic_adaptation_transform=None, apply_cctf_decoding=True, apply_cctf_encoding=False)[2]
-
-    input_clipped = np.clip(input, a_min=0, a_max=None)
-
-
-    gain = target_max / init_max
-
-
-    l = input_clipped / np.max(input)
-    a = (32 * inflection_percent**4) + 1 #adjusts how soon the gain applies
-    out  = (input * gain * l**a) + ((1-l**a) * input)
-
-
-    print("Tone Mapping : Init Max = " , init_max, "Target Max = ", target_max, " Scale Amount = ",gain )
-
-    return out
 
 def tone_map_xyY(input,inflection_percent,init_max):
 
@@ -2952,7 +2703,7 @@ def tone_map_xyY(input,inflection_percent,init_max):
     target_max = colour.XYZ_to_xyY(target_max)[2]
     middle_gray = colour.XYZ_to_xyY(middle_gray)[2]
 
-    input = colour.RGB_to_RGB(input, RGB_COLOURSPACE_LIN_sRGB, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,
+    input = colour.RGB_to_RGB(input, RGB_COLOURSPACE_ACES2065_1, RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,
                              chromatic_adaptation_transform=None, apply_cctf_decoding=False,apply_cctf_encoding=False)
     input = colour.XYZ_to_xyY(input) #Convert to xxY colorspace
     out = input.copy()
@@ -2967,7 +2718,7 @@ def tone_map_xyY(input,inflection_percent,init_max):
     print("Tone Mapping : Init Max = " , init_max, "Target Max = ", target_max, " Scale Amount = ",gain )
 
     out = colour.xyY_to_XYZ(out)  #Return back to Lin-SRGB
-    out = colour.RGB_to_RGB(out,  RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,RGB_COLOURSPACE_LIN_sRGB,
+    out = colour.RGB_to_RGB(out,  RGB_COLOURSPACE_LIN_CIEXYZ_SCENE,RGB_COLOURSPACE_ACES2065_1,
                       chromatic_adaptation_transform=None, apply_cctf_decoding=False, apply_cctf_encoding=False)
 
     return out
@@ -2976,25 +2727,19 @@ def tone_map_xyY(input,inflection_percent,init_max):
 def wb_error(three_by_three,print_results, s_gamma,s_gain, bez_curve_hue_hue,bez_curve_hue_sat):
     input = [MIDDLE_GRAY_LIN,MIDDLE_GRAY_LIN,MIDDLE_GRAY_LIN]
     ACES2065_rgb = np.matmul(input,three_by_three)
-    #print ("LinSRGB= ", linSRGB)
     if  not (s_gamma ==1 and s_gain ==1):
         HSL = ACES2065_2_HSL(ACES2065_rgb)
-        #print ("HSL = ", HSL)
         HSL[ 1] = HSL[ 1] ** (1 / s_gamma)  # Apply Saturation Gamma
         HSL[1] = HSL[1] * s_gain  # Apply Saturation Gain
         HSL[ 0] = HSL[ 0] + interp_1d(HSL[0],bez_curve_hue_hue)  # Apply Hue_hue Curve
         HSL[ 1] = HSL[1] * interp_1d(HSL[ 0], bez_curve_hue_sat)  # Apply Hue_sat Curve
-        #print("HSL = ", HSL)
         ACES2065_rgb = HSL_2_ACES2065(HSL)  # Convert back to sRGB
-    #print("LinSRGB= ", linSRGB)
 
     DWG = ACES2065_2_DWG_I_CAT(ACES2065_rgb)
 
     if np.min(DWG) <= 0: error = 100
     else: error = (np.max(DWG)**2/np.min(DWG)**2) - 1
     if print_results : print ( "White point error, DWG values = ", DWG)
-
-    #print("ILLUMINANT = ",  ILLUMINANT, " linSRGB = ", linSRGB," DWG = ", DWG, " Error = ", error)
 
     return error
 
@@ -3007,7 +2752,6 @@ def debevec(chart_name_low, chart_name_high, input_whitepoint, input_MG ):
     for i in range (chart_name_low, chart_name_high+1):
         times[n] = 2**i
         n+=1
-
 
     img_fn = []
 
@@ -3031,37 +2775,21 @@ def debevec(chart_name_low, chart_name_high, input_whitepoint, input_MG ):
     existing_MG = weighted_average[int(input_MG * 256)]
     weighted_average = weighted_average * (MIDDLE_GRAY_LIN / existing_MG)  #Scale so input middle gray = 0.18
     responseDebevec = responseDebevec * (MIDDLE_GRAY_LIN / existing_MG)
-    #print ("Existing MG = ", existing_MG, " New_MG = ",weighted_average[int(input_MG * 256)])
 
     # Generate new x values for a smoother curve
     x_new = np.linspace(0, 1, 256)
     derivatives = np.gradient(weighted_average, x_new)
     hermite_spline = CubicHermiteSpline(x_new, weighted_average, derivatives)
 
-    """#More points for smooth curve
-    y_new = hermite_spline(x_new)
-
-    x = np.linspace(0,input_whitepoint,int(256 * input_whitepoint))
-    responseDebevec_gamma = np.power(responseDebevec, 1 / 2.2)
-    y_new_gamma = np.power(y_new, 1 / 2.2)
-
-    plt.title("Debevec curves")
-    plt.plot(x, responseDebevec_gamma[0:int(256 * input_whitepoint),  0], 'r')
-    plt.plot(x, responseDebevec_gamma[0:int(256 * input_whitepoint), 1], 'g')
-    plt.plot(x, responseDebevec_gamma[0:int(256 * input_whitepoint), 2], 'b')
-    plt.plot(x, y_new_gamma[0:int(256 * input_whitepoint)], 'k')
-    plt.show()"""
     return hermite_spline
 
 #Binary search to find best illuminant for Output CST
 def optimize_ouput_illum( three_by_three, s_gamma,s_gain, bez_curve_hue_hue,bez_curve_hue_sat):
     global ILLUMINANT
 
-
     init_color_error = wb_error(three_by_three, 0, s_gamma,s_gain, bez_curve_hue_hue,bez_curve_hue_sat)
     temperature = colour.xy_to_CCT(np.array(ILLUMINANT))
     print("\nExisting Output Illum = ", f'{ILLUMINANT[0]:.8f}', ",",f'{ILLUMINANT[1]:.8f}', " Temp = ", temperature, " Starting Error = ", init_color_error)
-
 
     illum_zero = ILLUMINANT
     illum_up = illum_zero
@@ -3082,7 +2810,6 @@ def optimize_ouput_illum( three_by_three, s_gamma,s_gain, bez_curve_hue_hue,bez_
             ILLUMINANT = illum_down
             error_down = wb_error(three_by_three, 0, s_gamma,s_gain, bez_curve_hue_hue,bez_curve_hue_sat)
 
-            #print ("Illum ", ILLUMINANT, " Zero ", error_zero, " Up ", error_up, " Down ", error_down)
 
             if (error_down< error_up) and (error_down< error_zero):
                 illum_zero = illum_down
@@ -3102,8 +2829,6 @@ def optimize_ouput_illum( three_by_three, s_gamma,s_gain, bez_curve_hue_hue,bez_
 
             ILLUMINANT = illum_down
             error_down = wb_error(three_by_three, 0, s_gamma,s_gain, bez_curve_hue_hue,bez_curve_hue_sat)
-
-            #print("Illum ", ILLUMINANT, " Zero ", error_zero, " Up ", error_up, " Down ", error_down)
 
             if (error_down < error_up) and (error_down < error_zero):
                 illum_zero = illum_down
@@ -3129,8 +2854,6 @@ def optimize_input_illum(test_chart_RGB, chart_name_low, chart_name_high,bez_cur
     test_chart_lin[:, :, :, 1] = interp_1d(test_chart_RGB[:, :, :, 1], bez_curve_lum)
     test_chart_lin[:, :, :, 2] = interp_1d(test_chart_RGB[:, :, :, 2], bez_curve_lum)
 
-
-
     illum_zero = INPUT_ILLUMINANT
 
     error = input_illum_error(test_chart_lin, three_by_three, INPUT_ILLUMINANT, inv_matrix)
@@ -3153,7 +2876,6 @@ def optimize_input_illum(test_chart_RGB, chart_name_low, chart_name_high,bez_cur
             INPUT_ILLUMINANT = illum_down
             error_down = input_illum_error(test_chart_lin, three_by_three, illum_down, inv_matrix)
 
-            #print ("Illum ", INPUT_ILLUMINANT, " Zero ", error_zero, " Up ", error_up, " Down ", error_down)
 
             if (error_down < error_up) and (error_down < error_zero):
                 illum_zero = illum_down
@@ -3173,8 +2895,6 @@ def optimize_input_illum(test_chart_RGB, chart_name_low, chart_name_high,bez_cur
 
             INPUT_ILLUMINANT = illum_down
             error_down = input_illum_error(test_chart_lin, three_by_three, illum_down, inv_matrix)
-
-            #print("Illum ", INPUT_ILLUMINANT, " Zero ", error_zero, " Up ", error_up, " Down ", error_down)
 
             if (error_down < error_up) and (error_down < error_zero):
                 illum_zero = illum_down
@@ -3206,16 +2926,13 @@ def input_illum_error(test_chart_lin,three_by_three, test_illum, inv_matrix):
     A = test[:,:,1] * WB_CHIPS #Filter out to only neutral chips
     B = test[:,:,2] *  WB_CHIPS
     return np.mean(A ** 2 + B ** 2)  #Calculate the mean Chroma
-    #return (abs(np.sum(A)) + abs(np.sum(B))) / np.sum(WB_CHIPS) #Calculate the mean Chroma
 
 
 def calc_dr(test_chart, chart_name_low, chart_name_high, bez_curve_lum, input_whitepoint):
 
     darkest_chip = np.unravel_index(np.argmin(test_chart, axis=None), test_chart.shape)
-    #print("darkest_chip = ", darkest_chip)
     darkest_value = test_chart[darkest_chip]
     darkest_value_lin = interp_1d(darkest_value, bez_curve_lum)
-    #print("darkest_value_lin = ", darkest_value_lin)
     darkest_value_lin = np.clip(darkest_value_lin, a_min=2 ** -15, a_max=None)
     value = -1
     value_lin = -1
@@ -3223,12 +2940,9 @@ def calc_dr(test_chart, chart_name_low, chart_name_high, bez_curve_lum, input_wh
         value = test_chart[n,darkest_chip[1],darkest_chip[2],darkest_chip[3] ]
         value_lin = interp_1d(value, bez_curve_lum)
         value_lin = np.clip(value_lin, a_min=2 ** -15, a_max=None)
-        #print ("Chart N ", n, " Test Value_lin = ", value_lin)
-        if value_lin> darkest_value_lin *2:
-            #print("n = ", n," value_lin = ",value_lin)
+        if value_lin> darkest_value_lin *2:  #This chip is 1 stop brighter than darkest
             break
 
-    #print("Above Lin = ", interp_1d(input_whitepoint, bez_curve_lum), " Below = ", value_lin)
     abovestops =  math.log((interp_1d(input_whitepoint, bez_curve_lum) / .18), 2)
     belowstops = math.log((value_lin / .18), 2) - 1
     print("\nDynamic Range = ", abovestops-belowstops, " stops. ", abovestops, " above MG, ", belowstops, " below MG" )
