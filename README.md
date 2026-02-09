@@ -34,10 +34,11 @@ Place these files in the 'data' folder.  You can also place verification images 
 
 ### Dependencies;
 	scipy
-	multiprocessing
 	matplotlib
-	skimage
-	imageio.v3
+	scikit-image
+	opencv-python
+	pypng
+	imageio
 	colour-science
 	numpy
 	argparse
