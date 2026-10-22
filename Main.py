@@ -29,8 +29,9 @@ from pathlib import Path
 import argparse
 import multiprocessing as mp
 
-from CC_SG import *
+#from CC_SG import *
 #from CC_VIDEO_V1 import *  #Choose the specs for the right chart
+from DC_SPYDER_CHECKR24 import *  #Choose the specs for the right chart
 
 from beautifultable import BeautifulTable
 
